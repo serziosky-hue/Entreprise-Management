@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "releaseDate": "2026-03-28",
+  "changelog": [
+    "🎉 Première version officielle",
+    "🖨️ Impression ticket thermique 80mm pour les factures",
+    "📊 Tableaux interactifs desktop (ventes, crédits, dépenses, proformas)",
+    "🌗 Thème automatique selon le système (clair/sombre)",
+    "⚡ Synchronisation Firebase optimisée (delta uniquement)",
+    "📱 Interface mobile entièrement optimisée",
+    "⏳ Écran de chargement avec nom de l'entreprise"
+  ],
+  "newFeatures": {
+    "sales": "2026-03-28",
+    "credits": "2026-03-28",
+    "expenses": "2026-03-28",
+    "proformas": "2026-03-28",
+    "settings": "2026-03-28"
+  }
+}

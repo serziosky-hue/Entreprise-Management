@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Créer un compte — Enterprise Management Pro</title>
+  <script>
+    (function() {
+      var pref = localStorage.getItem('emp_theme') || 'system';
+      var isDark = pref === 'dark' ||
+        (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (!isDark) document.documentElement.classList.add('light');
+    })();
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:radial-gradient(ellipse at 30% 80%,#1e1b4b 0%,#0f172a 60%);min-height:100vh;padding:2rem 1rem;font-family:system-ui,-apple-system,sans-serif;}
+    .card{background:rgba(30,41,59,.95);border:1px solid rgba(99,102,241,.18);border-radius:1.25rem;padding:1.75rem;max-width:480px;margin:0 auto;box-shadow:0 24px 48px rgba(0,0,0,.5);}
+    .field{width:100%;background:rgba(15,23,42,.7);border:1.5px solid #334155;border-radius:.625rem;padding:.625rem 1rem;color:#f1f5f9;font-size:.875rem;outline:none;transition:border-color .18s;}
+    .field:focus{border-color:#6366f1;box-shadow:0 0 0 2px rgba(99,102,241,.2);}
+    .field::placeholder{color:#475569;}
+    .lbl{display:block;font-size:.6875rem;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.375rem;}
+    .btn-main{width:100%;padding:.75rem;background:#4f46e5;color:#fff;border-radius:.75rem;font-weight:700;font-size:.875rem;border:none;cursor:pointer;transition:background .18s;}
+    .btn-main:hover:not(:disabled){background:#4338ca;}
+    .btn-main:disabled{opacity:.55;cursor:not-allowed;}
+    /* Plan cards */
+    .plan-opt{cursor:pointer;flex:1;}
+    .plan-opt input{display:none;}
+    .plan-card{border:2px solid #334155;border-radius:.875rem;padding:.875rem;transition:all .18s;background:rgba(15,23,42,.5);height:100%;}
+    .plan-opt:hover .plan-card{border-color:#6366f1;}
+    .plan-opt input:checked + .plan-card{border-color:#6366f1;background:rgba(99,102,241,.12);box-shadow:0 0 0 3px rgba(99,102,241,.15);}
+    .plan-tag{display:inline-block;font-size:.625rem;font-weight:700;padding:2px 7px;border-radius:99px;text-transform:uppercase;letter-spacing:.05em;}
+    .err-box{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5;border-radius:.625rem;padding:.625rem .875rem;font-size:.8rem;margin-bottom:.875rem;display:none;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .spin{animation:spin .65s linear infinite;display:inline-block;}
+  </style>
+</head>
+<body>
+<div style="max-width:480px;margin:0 auto;">
+
+  <!-- Header -->
+  <div style="text-align:center;margin-bottom:1.5rem;">
+    <a href="login.html" style="display:inline-flex;align-items:center;gap:.375rem;color:#64748b;font-size:.8125rem;text-decoration:none;margin-bottom:1rem;transition:color .15s;" onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='#64748b'">
+      <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
+      Retour à la connexion
+    </a>
+    <div style="width:52px;height:52px;background:linear-gradient(135deg,#4f46e5,#7c3aed);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto .75rem;box-shadow:0 8px 20px rgba(79,70,229,.4);">
+      <svg style="width:26px;height:26px;" fill="none" stroke="white" stroke-width="1.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"/>
+      </svg>
+    </div>
+    <h1 style="color:#f1f5f9;font-weight:800;font-size:1.375rem;">Créer mon entreprise</h1>
+    <p style="color:#64748b;font-size:.8125rem;margin-top:.25rem;">7 jours d'essai gratuit sur tous les plans</p>
+  </div>
+
+  <!-- Succès -->
+  <div id="signup-success" style="display:none;" class="card">
+    <div style="text-align:center;padding:1rem 0;">
+      <div style="width:64px;height:64px;background:rgba(34,197,94,.15);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;border:2px solid rgba(34,197,94,.3);">
+        <svg style="width:32px;height:32px;color:#4ade80;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      <h2 style="color:#f1f5f9;font-weight:700;font-size:1.25rem;margin-bottom:.5rem;">Entreprise créée !</h2>
+      <p style="color:#64748b;font-size:.875rem;">Votre essai de 7 jours commence maintenant.<br>Redirection vers la connexion...</p>
+    </div>
+  </div>
+
+  <!-- Formulaire -->
+  <div id="signup-form" class="card">
+    <div id="signup-error" class="err-box"></div>
+
+    <div style="margin-bottom:.875rem;">
+      <label class="lbl">ID Entreprise <span style="color:#f87171;">*</span></label>
+      <input id="enterprise-id" type="text" autocomplete="off" placeholder="ex: magasin_tana" class="field">
+      <div id="id-hint" style="font-size:.6875rem;margin-top:.3rem;color:#64748b;">3–20 caractères : lettres minuscules, chiffres, _</div>
+    </div>
+
+    <div style="margin-bottom:.875rem;">
+      <label class="lbl">Nom de l'entreprise <span style="color:#f87171;">*</span></label>
+      <input id="enterprise-name" type="text" placeholder="ex: Magasin Tana Plus" class="field">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.875rem;">
+      <div>
+        <label class="lbl">Mot de passe <span style="color:#f87171;">*</span></label>
+        <input id="password" type="password" placeholder="Min. 4 caractères" class="field">
+      </div>
+      <div>
+        <label class="lbl">Confirmer <span style="color:#f87171;">*</span></label>
+        <input id="password2" type="password" placeholder="Répéter" class="field">
+      </div>
+    </div>
+
+    <!-- Plans -->
+    <div style="margin-bottom:1.25rem;">
+      <label class="lbl" style="margin-bottom:.625rem;">Choisir un plan</label>
+      <!-- Essai gratuit banner -->
+      <div style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:.75rem;padding:.625rem .875rem;margin-bottom:.75rem;display:flex;align-items:center;gap:.625rem;">
+        <span style="font-size:1.125rem;">🎁</span>
+        <div>
+          <div style="color:#4ade80;font-weight:700;font-size:.8125rem;">7 jours d'essai GRATUIT</div>
+          <div style="color:#64748b;font-size:.6875rem;">Toutes les fonctionnalités, sans engagement. L'abonnement commence après l'essai.</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;">
+
+        <label class="plan-opt">
+          <input type="radio" name="plan" value="BASIC" id="plan-basic" checked>
+          <div class="plan-card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.375rem;">
+              <span style="color:#f1f5f9;font-weight:700;font-size:.9375rem;">Basic</span>
+              <span class="plan-tag" style="background:rgba(99,102,241,.2);color:#a5b4fc;">Pop.</span>
+            </div>
+            <div style="color:#6366f1;font-weight:800;font-size:1.0625rem;">10 000 Ar</div>
+            <div style="color:#64748b;font-size:.625rem;margin-bottom:.5rem;">/30 jours</div>
+            <ul style="list-style:none;font-size:.6875rem;color:#94a3b8;line-height:1.7;">
+              <li>✓ 3 utilisateurs</li>
+              <li>✓ Sync automatique</li>
+              <li>✓ Support email</li>
+            </ul>
+          </div>
+        </label>
+
+        <label class="plan-opt">
+          <input type="radio" name="plan" value="PREMIUM" id="plan-premium">
+          <div class="plan-card" style="border-color:rgba(167,139,250,.3);">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.375rem;">
+              <span style="color:#f1f5f9;font-weight:700;font-size:.9375rem;">Premium</span>
+              <span class="plan-tag" style="background:rgba(167,139,250,.2);color:#c4b5fd;">Pro</span>
+            </div>
+            <div style="color:#a78bfa;font-weight:800;font-size:1.0625rem;">30 000 Ar</div>
+            <div style="color:#64748b;font-size:.625rem;margin-bottom:.5rem;">/30 jours</div>
+            <ul style="list-style:none;font-size:.6875rem;color:#94a3b8;line-height:1.7;">
+              <li>✓ 10 utilisateurs</li>
+              <li>✓ Sync automatique</li>
+              <li>✓ Export avancé</li>
+              <li>✓ Support prioritaire</li>
+            </ul>
+          </div>
+        </label>
+
+        <label class="plan-opt">
+          <input type="radio" name="plan" value="LOCAL" id="plan-local">
+          <div class="plan-card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.375rem;">
+              <span style="color:#f1f5f9;font-weight:700;font-size:.9375rem;">Local</span>
+              <span class="plan-tag" style="background:rgba(245,158,11,.15);color:#fbbf24;">∞</span>
+            </div>
+            <div style="color:#f59e0b;font-weight:800;font-size:1.0625rem;">70 000 Ar</div>
+            <div style="color:#64748b;font-size:.625rem;margin-bottom:.5rem;">perpétuel</div>
+            <ul style="list-style:none;font-size:.6875rem;color:#94a3b8;line-height:1.7;">
+              <li>✓ 1 utilisateur</li>
+              <li>✓ Hors ligne seulement</li>
+              <li>✓ Backup cloud manuel</li>
+              <li>✓ Licence à vie</li>
+            </ul>
+          </div>
+        </label>
+
+      </div>
+      <p id="plan-note" style="font-size:.6875rem;color:#475569;margin-top:.5rem;text-align:center;">
+        ⚡ Tous les plans incluent 7 jours d'essai gratuit. Paiement requis après l'essai.
+      </p>
+    </div>
+
+    <button id="signup-btn" class="btn-main" onclick="doSignup()">Créer mon entreprise</button>
+
+    <p style="text-align:center;font-size:.8125rem;color:#475569;margin-top:.875rem;">
+      Déjà un compte ? <a href="login.html" style="color:#818cf8;font-weight:600;text-decoration:none;">Se connecter</a>
+    </p>
+  </div>
+</div>
+
+<script src="db.js"></script>
+<script src="auth-signup.js"></script>
+</body>
+</html>

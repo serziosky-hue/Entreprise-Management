@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise Management Pro</title>
+  <!-- Anti-flash thème : appliqué immédiatement avant tout rendu -->
+  <script>
+    (function() {
+      var pref = localStorage.getItem('emp_theme') || 'system';
+      var isDark = pref === 'dark' ||
+        (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (!isDark) document.documentElement.classList.add('light');
+    })();
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    /* ══ Variables thème ══════════════════════════════════════════════ */
+    :root {
+      --bg:       #0f172a;
+      --bg2:      #1e293b;
+      --bg3:      #334155;
+      --border:   #334155;
+      --text:     #f1f5f9;
+      --text2:    #cbd5e1;
+      --muted:    #94a3b8;
+      --accent:   rgba(99,102,241,.18);
+      --accent-t: #a5b4fc;
+      --scroll:   #334155;
+      --topbar-h: 48px;
+    }
+    html.light {
+      --bg:       #f1f5f9;
+      --bg2:      #ffffff;
+      --bg3:      #e2e8f0;
+      --border:   #cbd5e1;
+      --text:     #0f172a;
+      --text2:    #1e293b;
+      --muted:    #64748b;
+      --accent:   rgba(79,70,229,.1);
+      --accent-t: #4f46e5;
+      --scroll:   #cbd5e1;
+    }
+
+    html, body { height: 100%; margin: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      transition: background .25s, color .25s;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+
+    /* ══ MODE CLAIR — Override complet ═════════════════════════════════════ */
+    /* Variables de base */
+    html.light body { background: #f0f4f8 !important; color: #1a202c !important; }
+    html.light #content { background: #f0f4f8 !important; }
+
+    /* ── Fonds ── */
+    html.light .bg-gray-900  { background-color: #e8edf3 !important; }
+    html.light .bg-gray-800  { background-color: #ffffff !important; }
+    html.light .bg-gray-700  { background-color: #f1f5f9 !important; }
+    html.light .bg-gray-700\/50, html.light .bg-gray-700\/30, html.light .bg-gray-700\/40 { background-color: rgba(226,232,240,.6) !important; }
+    html.light .bg-gray-600  { background-color: #e2e8f0 !important; }
+    html.light .bg-gray-600\/20 { background-color: rgba(203,213,225,.4) !important; }
+    html.light .bg-gray-500  { background-color: #cbd5e1 !important; }
+    html.light .bg-black\/60 { background-color: rgba(0,0,0,.35) !important; }
+
+    /* ── Textes ── */
+    html.light .text-white   { color: #1a202c !important; }
+    html.light .text-gray-100, html.light .text-gray-200 { color: #2d3748 !important; }
+    html.light .text-gray-300 { color: #4a5568 !important; }
+    html.light .text-gray-400 { color: #718096 !important; }
+    html.light .text-gray-500 { color: #718096 !important; }
+    html.light .text-gray-600 { color: #4a5568 !important; }
+
+    /* ── Bordures ── */
+    html.light .border-gray-900, html.light .border-gray-800 { border-color: #e2e8f0 !important; }
+    html.light .border-gray-700 { border-color: #cbd5e1 !important; }
+    html.light .border-gray-600 { border-color: #a0aec0 !important; }
+    html.light .border-gray-500 { border-color: #a0aec0 !important; }
+    html.light .border-t, html.light .border-b { border-color: #e2e8f0 !important; }
+    html.light .divide-gray-700 > * + * { border-color: #e2e8f0 !important; }
+
+    /* ── Hover ── */
+    html.light .hover\:bg-gray-600:hover { background-color: #e2e8f0 !important; }
+    html.light .hover\:bg-gray-700:hover { background-color: #edf2f7 !important; }
+    html.light .hover\:bg-gray-800:hover { background-color: #f7fafc !important; }
+    html.light tbody tr:hover { background-color: #ebf4ff !important; }
+    html.light tr:hover td   { background-color: #ebf4ff !important; }
+
+    /* ── Inputs, selects, textareas ── */
+    html.light input:not([type=checkbox]):not([type=radio]):not([type=range]),
+    html.light select,
+    html.light textarea {
+      background-color: #ffffff !important;
+      color: #1a202c !important;
+      border-color: #a0aec0 !important;
+    }
+    html.light input::placeholder, html.light textarea::placeholder { color: #a0aec0 !important; }
+    html.light input:focus, html.light select:focus, html.light textarea:focus {
+      border-color: #4f46e5 !important;
+      box-shadow: 0 0 0 2px rgba(79,70,229,.15) !important;
+    }
+    html.light input[type=date] { color-scheme: light; }
+
+    /* ── Tables ── */
+    html.light table { background: #ffffff !important; }
+    html.light thead, html.light thead tr { background: #f7fafc !important; }
+    html.light th { color: #4a5568 !important; background: #f7fafc !important; border-color: #e2e8f0 !important; }
+    html.light td { color: #2d3748 !important; border-color: #e2e8f0 !important; }
+
+    /* ── Badges ── */
+    html.light .badge-success { background: rgba(21,128,61,.12) !important; color: #15803d !important; }
+    html.light .badge-danger  { background: rgba(185,28,28,.12) !important; color: #b91c1c !important; }
+    html.light .badge-warning { background: rgba(161,98,7,.12)  !important; color: #a16207 !important; }
+    html.light .badge-info    { background: rgba(79,70,229,.12) !important; color: #4f46e5 !important; }
+    html.light .badge-muted   { background: #e2e8f0 !important; color: #4a5568 !important; }
+
+    /* ── Couleurs de statut inchangées ── */
+    html.light [class*="text-green"]  { /* conserver */ }
+    html.light [class*="text-red"]    { /* conserver */ }
+    html.light [class*="text-yellow"] { /* conserver */ }
+    html.light [class*="text-blue"]   { /* conserver */ }
+    html.light [class*="text-indigo"] { /* conserver */ }
+    html.light [class*="text-purple"] { /* conserver */ }
+    html.light [class*="text-orange"] { /* conserver */ }
+
+    /* Fond des alertes colorées */
+    html.light .bg-red-500\/10    { background-color: rgba(239,68,68,.08) !important; }
+    html.light .bg-green-500\/10  { background-color: rgba(34,197,94,.08) !important; }
+    html.light .bg-yellow-500\/10 { background-color: rgba(234,179,8,.08) !important; }
+    html.light .bg-indigo-500\/10, html.light .bg-indigo-600\/20 { background-color: rgba(99,102,241,.08) !important; }
+    html.light .bg-orange-500\/10 { background-color: rgba(249,115,22,.08) !important; }
+
+    /* ── Boutons ── */
+    html.light button[class*="bg-gray-700"]:not([class*="text-red"]):not([class*="text-green"]) {
+      background-color: #e2e8f0 !important; color: #2d3748 !important; border-color: #cbd5e1 !important;
+    }
+    html.light button[class*="bg-gray-700"]:hover { background-color: #cbd5e1 !important; }
+    html.light button[class*="bg-gray-600"] { background-color: #e2e8f0 !important; color: #2d3748 !important; }
+
+    /* ── Cards dynamiques (générées par JS) ── */
+    html.light .rounded-xl[class*="bg-gray"],
+    html.light .rounded-lg[class*="bg-gray"] {
+      background-color: #ffffff !important;
+      border-color: #e2e8f0 !important;
+      color: #1a202c !important;
+    }
+
+    /* ── Navigation ── */
+    html.light #sidebar, html.light #drawer-panel { background: #ffffff !important; border-color: #e2e8f0 !important; }
+    html.light .nav-item         { color: #718096 !important; }
+    html.light .nav-item:hover   { background: rgba(79,70,229,.07) !important; color: #4a5568 !important; }
+    html.light .nav-item.active  { background: rgba(79,70,229,.12) !important; color: #4f46e5 !important; }
+    html.light .nav-sep          { border-color: #e2e8f0 !important; }
+    html.light #sidebar-footer   { border-color: #e2e8f0 !important; background: #ffffff !important; }
+
+    /* ── Topbar ── */
+    html.light #topbar { background: #ffffff !important; border-color: #e2e8f0 !important; }
+    html.light #topbar .brand { color: #1a202c !important; }
+    html.light #topbar-poste { background: #f0f4f8 !important; border-color: #e2e8f0 !important; color: #4a5568 !important; }
+    html.light #topbar-sync  { color: #718096 !important; }
+
+    /* ── Bottom nav ── */
+    html.light #bottom-nav { background: #ffffff !important; border-color: #e2e8f0 !important; }
+    html.light .bnav-item  { color: #a0aec0 !important; }
+    html.light .bnav-item.active { color: #4f46e5 !important; }
+
+    /* ── Modales ── */
+    html.light #global-modal > div { background: #ffffff !important; border-color: #e2e8f0 !important; color: #1a202c !important; }
+    html.light .modal-box { background: #ffffff !important; }
+
+    /* ── Toast container ── */
+    html.light .toast { background: #ffffff !important; border-color: #e2e8f0 !important; color: #2d3748 !important; }
+
+    /* ── Settings sidebar ── */
+    html.light #settings-sidebar { background: #f7fafc !important; border-color: #e2e8f0 !important; }
+    html.light #settings-select-row { background: #f7fafc !important; border-color: #e2e8f0 !important; }
+
+    /* ── Scrollbar ── */
+    html.light ::-webkit-scrollbar-thumb { background: #cbd5e1 !important; }
+    html.light ::-webkit-scrollbar-track { background: #f0f4f8 !important; }
+
+    /* ══ Topbar ═══════════════════════════════════════════════════════ */
+    #topbar {
+      height: var(--topbar-h);
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 1rem;
+      gap: .75rem;
+      flex-shrink: 0;
+      z-index: 30;
+    }
+    #topbar .brand {
+      display: flex; align-items: center; gap: .5rem;
+      font-size: .9rem; font-weight: 700; color: var(--text);
+      text-decoration: none; flex-shrink: 0;
+    }
+    #topbar .brand-icon {
+      width: 28px; height: 28px;
+      background: linear-gradient(135deg,#4f46e5,#7c3aed);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #topbar .spacer { flex: 1; }
+    /* Indicateur sync dans topbar */
+    #topbar-sync { font-size: .75rem; color: var(--muted); }
+    /* Nom du poste */
+    #topbar-poste {
+      font-size: .75rem; color: var(--muted);
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 6px; padding: 3px 8px;
+      white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis;
+    }
+    /* Bouton sync (visible si pending) */
+    #topbar-sync-btn {
+      display: none;
+      align-items: center; gap: 5px;
+      padding: 4px 10px;
+      background: rgba(245,158,11,.15);
+      border: 1px solid rgba(245,158,11,.35);
+      border-radius: 7px;
+      color: #fbbf24; font-size: .75rem; font-weight: 600;
+      cursor: pointer; transition: background .15s;
+    }
+    #topbar-sync-btn:hover { background: rgba(245,158,11,.28); }
+    /* Bouton toggle thème */
+    #theme-toggle {
+      width: 34px; height: 34px;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; cursor: pointer;
+      color: var(--muted); font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .15s; flex-shrink: 0;
+    }
+    #theme-toggle:hover { color: var(--text); border-color: var(--accent-t); }
+    /* Bouton menu mobile */
+    #menu-btn {
+      display: none;
+      width: 34px; height: 34px;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; cursor: pointer;
+      color: var(--muted); align-items: center; justify-content: center;
+      transition: color .15s;
+    }
+    #menu-btn:hover { color: var(--text); }
+
+    /* ══ Layout ═══════════════════════════════════════════════════════ */
+    #app-body { flex: 1; display: flex; overflow: hidden; }
+
+    /* ══ Sidebar ══════════════════════════════════════════════════════ */
+    #sidebar {
+      width: 220px; flex-shrink: 0;
+      background: var(--bg2); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow-y: auto; transition: background .25s;
+    }
+    #sidebar .brand-row {
+      padding: .875rem 1rem .75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    #sidebar .company { font-weight: 700; font-size: .875rem; color: var(--text); }
+    #sidebar .sync-row { font-size: .6875rem; color: var(--muted); margin-top: .2rem; }
+    .nav-item {
+      display: flex; align-items: center; gap: 9px;
+      padding: 7px 10px; border-radius: 9px;
+      cursor: pointer; font-size: .8125rem; color: var(--muted);
+      transition: all .15s; user-select: none;
+    }
+    .nav-item:hover { background: var(--accent); color: var(--text2); }
+    .nav-item.active { background: rgba(99,102,241,.2); color: var(--accent-t); font-weight: 600; }
+    .nav-item .nav-icon { width: 17px; height: 17px; flex-shrink: 0; }
+    .nav-sep { border: none; border-top: 1px solid var(--border); margin: .3rem 0; }
+    .badge-alert { background: #dc2626; color: #fff; font-size: 10px; padding: 0 5px; border-radius: 99px; min-width: 16px; text-align: center; }
+    #sidebar-footer { padding: .625rem; border-top: 1px solid var(--border); }
+    /* Bouton sync sidebar */
+    #sync-now-btn {
+      display: none; width: 100%; margin-bottom: .35rem;
+      padding: 6px 10px;
+      background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.3);
+      border-radius: 9px; color: #fbbf24; font-size: .8rem; font-weight: 600;
+      cursor: pointer; align-items: center; gap: 6px; transition: background .15s;
+    }
+    #sync-now-btn:hover { background: rgba(245,158,11,.22); }
+
+    /* ══ Contenu ══════════════════════════════════════════════════════ */
+    #content {
+      flex: 1; overflow-y: auto; background: var(--bg);
+      transition: background .25s;
+    }
+    @media (max-width: 768px) {
+      #content { padding-bottom: 56px; }
+    }
+    .tab-content { display: none; }
+    .tab-content:not(.hidden) { display: block; }
+
+    /* ══ Bottom nav mobile ════════════════════════════════════════════ */
+    #bottom-nav {
+      display: none;
+      background: var(--bg2); border-top: 1px solid var(--border);
+      z-index: 30;
+    }
+    .bnav-item {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; gap: 2px; padding: 6px 4px;
+      font-size: 10px; color: var(--muted); cursor: pointer; transition: color .15s;
+    }
+    .bnav-item.active { color: var(--accent-t); }
+
+    /* ══ Drawer mobile ════════════════════════════════════════════════ */
+    #drawer { display: none; position: fixed; inset: 0; z-index: 50; }
+    #drawer.open { display: flex; }
+    #drawer-overlay { position: absolute; inset: 0; background: rgba(0,0,0,.55); }
+    #drawer-panel {
+      position: relative; width: 260px; height: 100%;
+      background: var(--bg2); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow-y: auto;
+      animation: slideIn .2s ease;
+    }
+    @keyframes slideIn { from { transform: translateX(-100%); } to { transform: none; } }
+
+    /* ══ Toast ════════════════════════════════════════════════════════ */
+    #toast-container { position: fixed; top: 3.5rem; right: 1rem; z-index: 9999; display: flex; flex-direction: column; gap: 7px; }
+
+    /* ══ Scrollbar ════════════════════════════════════════════════════ */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    /* Settings sidebar desktop */
+    @media (min-width: 769px) {
+      .sm-show-flex { display: flex !important; flex-direction: column; }
+      #settings-select-row { display: none !important; }
+    }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 2px; }
+
+    /* ══ Settings layout ══════════════════════════════════════════════ */
+    /* tab-settings display géré par switchTab en JS */
+
+    /* ══ Responsive ═══════════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      #sidebar { display: none; }
+      #menu-btn { display: flex; }
+      #bottom-nav { display: flex; }
+      #content { padding-bottom: 56px; }
+      #topbar-poste { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ TOPBAR ═══════════════════════════════════════════════════════════════ -->
+<header id="topbar">
+  <!-- Menu mobile -->
+  <button id="menu-btn" onclick="openDrawer()">
+    <svg style="width:17px;height:17px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
+    </svg>
+  </button>
+
+  <!-- Marque -->
+  <a class="brand" href="#">
+    <div class="brand-icon">
+      <svg style="width:15px;height:15px;" fill="none" stroke="white" stroke-width="1.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15"/>
+      </svg>
+    </div>
+    <span id="company-name" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Enterprise Pro</span>
+  </a>
+
+  <div class="spacer"></div>
+
+  <!-- Sync indicator -->
+  <div id="topbar-sync"></div>
+
+  <!-- Bouton sync (pending) -->
+  <button id="topbar-sync-btn" onclick="APP.syncNow()" title="Synchroniser les données en attente">
+    <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+    </svg>
+    Sync <span id="topbar-pending-count"></span>
+  </button>
+
+  <!-- Nom du poste -->
+  <div id="topbar-poste">Admin</div>
+
+  <!-- Toggle thème déplacé dans Paramètres → Sécurité -->
+</header>
+
+<!-- ══ CORPS ═════════════════════════════════════════════════════════════════ -->
+<div id="app-body">
+
+  <!-- Sidebar desktop -->
+  <aside id="sidebar">
+    <div class="brand-row">
+      <div class="company" id="company-name-sidebar">Chargement...</div>
+      <div class="sync-row" id="sync-indicator"></div>
+      <div id="pending-badge" class="hidden" style="font-size:.6875rem;color:#fbbf24;margin-top:.15rem;"></div>
+    </div>
+
+    <nav style="padding:.5rem .5rem;flex:1;">
+      <div class="nav-item active" data-tab="dashboard">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125-.504 1.125-1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5"/></svg>
+        Tableau de bord
+      </div>
+      <div class="nav-item" data-tab="stock">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
+        Stock <span id="badge-stock" class="badge-alert ml-auto"></span>
+      </div>
+      <div class="nav-item" data-tab="sales">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/></svg>
+        Ventes
+      </div>
+      <div class="nav-item" data-tab="proformas">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+        Proformas
+      </div>
+      <div class="nav-item" data-tab="clients">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+        Clients
+      </div>
+      <div class="nav-item" data-tab="credits">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Crédits <span id="badge-credits" class="badge-alert ml-auto"></span>
+      </div>
+      <div class="nav-item" data-tab="expenses">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/></svg>
+        Dépenses
+      </div>
+      <div class="nav-item" data-tab="reports">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
+        Rapports
+      </div>
+      <hr class="nav-sep">
+      <div class="nav-item" data-tab="logs">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+        Journal
+      </div>
+      <div class="nav-item" data-tab="settings">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Paramètres
+      </div>
+    </nav>
+
+    <div id="sidebar-footer">
+      <button id="sync-now-btn" onclick="APP.syncNow()">
+        <svg style="width:13px;height:13px;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+        ⟳ Synchroniser <span class="sync-count" style="opacity:.8;"></span>
+      </button>
+      <button onclick="logout()" class="nav-item w-full" style="color:#f87171;">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/></svg>
+        Déconnexion
+      </button>
+    </div>
+  </aside>
+
+  <!-- Contenu principal -->
+  <div id="content">
+    <div id="tab-dashboard" class="tab-content"></div>
+    <div id="tab-stock" class="tab-content hidden"></div>
+    <div id="tab-sales" class="tab-content hidden"></div>
+    <div id="tab-proformas" class="tab-content hidden"></div>
+    <div id="tab-clients" class="tab-content hidden"></div>
+    <div id="tab-credits" class="tab-content hidden"></div>
+    <div id="tab-expenses" class="tab-content hidden"></div>
+    <div id="tab-reports" class="tab-content hidden"></div>
+    <div id="tab-logs" class="tab-content hidden"></div>
+    <div id="tab-settings" class="tab-content hidden"></div>
+  </div>
+
+</div>
+
+<!-- ══ BOTTOM NAV MOBILE ══════════════════════════════════════════════════════ -->
+<nav id="bottom-nav">
+  <div class="bnav-item active" data-tab="dashboard">
+    <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25"/></svg>
+    <span>Accueil</span>
+  </div>
+  <div class="bnav-item" data-tab="stock">
+    <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5"/></svg>
+    <span>Stock <span id="badge-stock-m" class="badge-alert"></span></span>
+  </div>
+  <div class="bnav-item" data-tab="sales">
+    <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/></svg>
+    <span>Ventes</span>
+  </div>
+  <div class="bnav-item" data-tab="credits">
+    <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <span>Crédits <span id="badge-credits-m" class="badge-alert"></span></span>
+  </div>
+  <div class="bnav-item" data-tab="settings">
+    <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+    <span>Réglages</span>
+  </div>
+</nav>
+
+<!-- ══ DRAWER MOBILE ══════════════════════════════════════════════════════════ -->
+<div id="drawer">
+  <div id="drawer-overlay" onclick="closeDrawer()"></div>
+  <div id="drawer-panel">
+    <div style="padding:.875rem 1rem .75rem;border-bottom:1px solid var(--border);">
+      <div style="font-weight:700;font-size:.875rem;color:var(--text);" id="company-name-m">Enterprise Pro</div>
+      <div id="poste-name" style="font-size:.6875rem;color:var(--muted);margin-top:.15rem;">Admin</div>
+      <div id="sync-indicator-mobile" style="font-size:.6875rem;margin-top:.15rem;"></div>
+    </div>
+    <nav style="padding:.5rem;">
+      <div class="nav-item active" data-tab="dashboard">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25"/></svg>
+        Tableau de bord
+      </div>
+      <div class="nav-item" data-tab="stock">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5"/></svg>
+        Stock
+      </div>
+      <div class="nav-item" data-tab="sales">Ventes</div>
+      <div class="nav-item" data-tab="proformas">Proformas</div>
+      <div class="nav-item" data-tab="clients">Clients</div>
+      <div class="nav-item" data-tab="credits">Crédits</div>
+      <div class="nav-item" data-tab="expenses">Dépenses</div>
+      <div class="nav-item" data-tab="reports">Rapports</div>
+      <hr class="nav-sep">
+      <div class="nav-item" data-tab="logs">Journal</div>
+      <div class="nav-item" data-tab="settings">Paramètres</div>
+    </nav>
+    <div style="padding:.5rem;border-top:1px solid var(--border);margin-top:auto;">
+      <button onclick="APP.syncNow()" style="width:100%;padding:7px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:9px;color:#fbbf24;font-size:.8rem;font-weight:600;cursor:pointer;margin-bottom:.35rem;">⟳ Synchroniser</button>
+      <button onclick="logout()" class="nav-item w-full" style="color:#f87171;">Déconnexion</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast-container"></div>
+
+<!-- Scripts -->
+<script src="db.js"></script>
+<script src="firebase-manager.js"></script>
+<script src="sync-manager.js"></script>
+<script src="subscription.js"></script>
+<script src="system-services.js"></script>
+<script src="app.js"></script>
+<script src="dashboard.js"></script>
+<script src="stocks.js"></script>
+<script src="sales.js"></script>
+<script src="clients.js"></script>
+<script src="credits.js"></script>
+<script src="expenses.js"></script>
+<script src="proforma.js"></script>
+<script src="reports.js"></script>
+<script src="logs.js"></script>
+<script src="config.js"></script>
+
+<script>
+function openDrawer() {
+  document.getElementById('drawer').classList.add('open');
+}
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+}
+
+// Enregistrement du Service Worker (cache offline + MAJ)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => {
+        // Vérifier si une nouvelle version du SW est disponible
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // Nouvelle version disponible — sera prise en compte au prochain chargement
+              console.log('[SW] Nouvelle version disponible au prochain démarrage.');
+            }
+          });
+        });
+      })
+      .catch(e => console.warn('[SW] Enregistrement échoué:', e));
+  });
+}
+</script>
+</body>
+</html>

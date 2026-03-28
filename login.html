@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connexion — Enterprise Management Pro</title>
+  <script>
+    (function() {
+      var pref = localStorage.getItem('emp_theme') || 'system';
+      var isDark = pref === 'dark' ||
+        (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (!isDark) document.documentElement.classList.add('light');
+    })();
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: radial-gradient(ellipse at 65% 15%, #1e1b4b 0%, #0f172a 55%, #111827 100%);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem; font-family: system-ui, -apple-system, sans-serif;
+    }
+    .wrap { width: 100%; max-width: 380px; }
+
+    /* ── Carte principale ── */
+    .card {
+      background: rgba(30,41,59,.95);
+      border: 1px solid rgba(99,102,241,.18);
+      border-radius: 1.25rem;
+      overflow: hidden;
+      box-shadow: 0 24px 48px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.03);
+    }
+
+    /* ── Steps ── */
+    .step { display: none; padding: 1.75rem; }
+    .step.active { display: block; animation: up .22s ease; }
+    @keyframes up { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+
+    /* ── Champs ── */
+    .field {
+      width: 100%;
+      background: rgba(15,23,42,.65);
+      border: 1.5px solid #334155;
+      border-radius: .625rem;
+      padding: .625rem 1rem;
+      color: #f1f5f9; font-size: .875rem;
+      transition: border-color .18s, box-shadow .18s;
+      outline: none;
+    }
+    .field:focus { border-color: #6366f1; box-shadow: 0 0 0 2.5px rgba(99,102,241,.22); }
+    .field::placeholder { color: #475569; }
+
+    /* ── Boutons ── */
+    .btn { width: 100%; padding: .75rem; border-radius: .75rem; font-weight: 600; font-size: .875rem; border: none; cursor: pointer; transition: all .18s; }
+    .btn-primary { background: #4f46e5; color: white; }
+    .btn-primary:hover:not(:disabled) { background: #4338ca; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(79,70,229,.4); }
+    .btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-ghost { background: rgba(51,65,85,.5); border: 1px solid #334155; color: #94a3b8; }
+    .btn-ghost:hover { background: rgba(51,65,85,.8); color: #e2e8f0; }
+
+    /* ── Label ── */
+    .lbl { display: block; font-size: .6875rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .375rem; }
+
+    /* ── Alertes ── */
+    .err { display: none; background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; border-radius: .625rem; padding: .625rem .875rem; font-size: .8rem; margin-bottom: .875rem; }
+    .tip { display: none; background: rgba(99,102,241,.1); border: 1px solid rgba(99,102,241,.2); color: #a5b4fc; border-radius: .625rem; padding: .5rem .875rem; font-size: .75rem; margin-bottom: .75rem; }
+
+    /* ── Mode radio ── */
+    .mode-opt { flex: 1; cursor: pointer; }
+    .mode-opt input { display: none; }
+    .mode-box { border: 1.5px solid #334155; border-radius: .75rem; padding: .625rem; text-align: center; transition: all .18s; }
+    .mode-opt input:checked + .mode-box { border-color: #6366f1; background: rgba(99,102,241,.12); }
+    .mode-box:hover { border-color: #6366f1; }
+
+    /* ── Poste cards ── */
+    .poste-card {
+      width: 100%; display: flex; align-items: center; gap: .75rem;
+      padding: .75rem .875rem;
+      background: rgba(30,41,59,.7); border: 1.5px solid #334155;
+      border-radius: .75rem; cursor: pointer;
+      transition: all .18s; margin-bottom: .5rem; color: #f1f5f9;
+      text-align: left;
+    }
+    .poste-card:last-child { margin-bottom: 0; }
+    .poste-card:hover { border-color: #6366f1; background: rgba(99,102,241,.1); transform: translateX(2px); }
+    .poste-card.selected { border-color: #6366f1; background: rgba(99,102,241,.15); }
+    .poste-avatar {
+      width: 38px; height: 38px; border-radius: .5rem; flex-shrink: 0;
+      background: rgba(99,102,241,.2); display: flex; align-items: center; justify-content: center;
+    }
+    .poste-info { flex: 1; min-width: 0; }
+    .poste-name { font-weight: 600; font-size: .875rem; color: #f1f5f9; }
+    .poste-meta { font-size: .6875rem; color: #64748b; margin-top: .1rem; }
+    .poste-lock { font-size: .875rem; opacity: .8; flex-shrink: 0; }
+
+    /* ── Loading skeleton ── */
+    .skeleton { background: linear-gradient(90deg, rgba(51,65,85,.5) 25%, rgba(71,85,105,.5) 50%, rgba(51,65,85,.5) 75%); background-size: 200%; animation: shimmer 1.2s infinite; border-radius: .75rem; height: 58px; margin-bottom: .5rem; }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+
+    /* ── Séparateur ── */
+    .sep { border: none; border-top: 1px solid #1e293b; margin: 1rem 0; }
+
+    /* ── Retour ── */
+    .back-btn {
+      display: inline-flex; align-items: center; gap: .375rem;
+      background: none; border: none; color: #64748b; font-size: .8rem; cursor: pointer;
+      padding: .25rem 0; transition: color .15s; margin-bottom: .875rem;
+    }
+    .back-btn:hover { color: #a5b4fc; }
+
+    /* ── Spinner ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin .65s linear infinite; display: inline-block; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- ÉTAPE 1 : ID Entreprise + Mode de connexion            -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <div class="card">
+    <div id="step-1" class="step active">
+
+      <!-- Logo -->
+      <div style="text-align:center; margin-bottom:1.5rem;">
+        <div style="width:54px;height:54px;background:linear-gradient(135deg,#4f46e5,#7c3aed);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto .75rem;box-shadow:0 8px 20px rgba(79,70,229,.4);">
+          <svg style="width:27px;height:27px;" fill="none" stroke="white" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"/>
+          </svg>
+        </div>
+        <h1 style="color:#f1f5f9;font-weight:800;font-size:1.3125rem;letter-spacing:-.01em;">Enterprise Pro</h1>
+        <p style="color:#64748b;font-size:.8125rem;margin-top:.25rem;">Gestion d'entreprise PME</p>
+      </div>
+
+      <div id="e1-err" class="err"></div>
+      <div id="e1-tip" class="tip"></div>
+
+      <!-- ID Entreprise -->
+      <div style="margin-bottom:.875rem;">
+        <label class="lbl">ID Entreprise</label>
+        <input id="f-id" type="text" autocomplete="username" placeholder="ex: monentreprise_mg" class="field">
+      </div>
+
+      <!-- Mode -->
+      <div style="margin-bottom:.875rem;">
+        <label class="lbl">Mode de connexion</label>
+        <div style="display:flex;gap:.5rem;">
+          <label class="mode-opt">
+            <input type="radio" name="mode" value="online" id="m-online" checked>
+            <div class="mode-box">
+              <div style="font-size:1rem;margin-bottom:.15rem;">🌐</div>
+              <div style="color:#f1f5f9;font-size:.75rem;font-weight:700;">En ligne</div>
+              <div style="color:#64748b;font-size:.625rem;">Cloud</div>
+            </div>
+          </label>
+          <label class="mode-opt">
+            <input type="radio" name="mode" value="offline" id="m-offline">
+            <div class="mode-box">
+              <div style="font-size:1rem;margin-bottom:.15rem;">📴</div>
+              <div style="color:#f1f5f9;font-size:.75rem;font-weight:700;">Hors ligne</div>
+              <div style="color:#64748b;font-size:.625rem;">Local only</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Se souvenir -->
+      <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;margin-bottom:1rem;">
+        <input id="f-rem" type="checkbox" style="width:15px;height:15px;accent-color:#6366f1;">
+        <span style="font-size:.8125rem;color:#94a3b8;">Se souvenir de moi</span>
+      </label>
+
+      <button id="btn-1" class="btn btn-primary" onclick="loadPostes()">Continuer →</button>
+
+      <hr class="sep">
+      <p style="text-align:center;font-size:.8125rem;color:#475569;">
+        Pas de compte ? <a href="signup.html" style="color:#818cf8;font-weight:600;text-decoration:none;">Créer une entreprise</a>
+      </p>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════ -->
+    <!-- ÉTAPE 2 : Sélection du poste                           -->
+    <!-- ════════════════════════════════════════════════════════ -->
+    <div id="step-2" class="step">
+      <button class="back-btn" onclick="goTo(1)">
+        <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
+        Retour
+      </button>
+
+      <div style="margin-bottom:1rem;">
+        <h2 style="color:#f1f5f9;font-weight:700;font-size:1rem;">Choisir un poste</h2>
+        <p id="s2-company" style="color:#818cf8;font-size:.8125rem;margin-top:.2rem;"></p>
+      </div>
+
+      <div id="e2-err" class="err"></div>
+
+      <!-- Liste des postes -->
+      <div id="poste-list" style="max-height:300px;overflow-y:auto;"></div>
+
+      <!-- Option admin -->
+      <hr class="sep">
+      <button class="poste-card" onclick="selectAdmin()" style="background:rgba(99,102,241,.08);border-color:rgba(99,102,241,.25);">
+        <div class="poste-avatar" style="background:rgba(99,102,241,.25);">
+          <svg style="width:18px;height:18px;color:#a5b4fc;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/>
+          </svg>
+        </div>
+        <div class="poste-info">
+          <div class="poste-name" style="color:#a5b4fc;">Connexion Administrateur</div>
+          <div class="poste-meta">Accès complet à tous les modules</div>
+        </div>
+        <svg style="width:14px;height:14px;color:#6366f1;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+      </button>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════ -->
+    <!-- ÉTAPE 3 : Mot de passe                                 -->
+    <!-- ════════════════════════════════════════════════════════ -->
+    <div id="step-3" class="step">
+      <button class="back-btn" onclick="goTo(2)">
+        <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
+        Changer de poste
+      </button>
+
+      <!-- Récap poste sélectionné -->
+      <div id="s3-poste" style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;padding:.875rem;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:.875rem;"></div>
+
+      <div id="e3-err" class="err"></div>
+
+      <div style="margin-bottom:.875rem;">
+        <label class="lbl" id="s3-pwd-label">Mot de passe</label>
+        <div style="position:relative;">
+          <input id="f-pwd" type="password" autocomplete="current-password" placeholder="••••••••" class="field" style="padding-right:2.75rem;">
+          <button type="button" onclick="togglePwd()" style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#475569;padding:2px;transition:color .15s;" onmouseover="this.style.color='#94a3b8'" onmouseout="this.style.color='#475569'">
+            <svg id="eye-icon" style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <button id="btn-3" class="btn btn-primary" onclick="validatePwd()">Se connecter</button>
+
+      <!-- Poste sans mot de passe → bouton direct -->
+      <div id="no-pwd-section" style="display:none;text-align:center;margin-top:.75rem;">
+        <p style="color:#64748b;font-size:.8125rem;margin-bottom:.75rem;">Ce poste n'a pas de mot de passe.</p>
+        <button class="btn btn-primary" onclick="finalize(_curPoste)">Accéder →</button>
+      </div>
+    </div>
+
+  </div><!-- /card -->
+  <p style="text-align:center;color:#1e293b;font-size:.625rem;margin-top:.75rem;">Enterprise Management Pro v1.0</p>
+</div><!-- /wrap -->
+
+<script src="db.js"></script>
+<script>
+'use strict';
+
+// ─── État ────────────────────────────────────────────────────────────────────
+let _cfg  = null;   // config complète (depuis Firebase ou IndexedDB)
+let _sess = null;   // { id, mode, remember }
+let _curPoste = null; // poste sélectionné (objet) ou 'admin'
+let _loadedSub = null;  // subscription chargée
+
+// ─── Utils ───────────────────────────────────────────────────────────────────
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function hashPwd(pwd) {
+  let h = 0;
+  for (let i = 0; i < pwd.length; i++) h = Math.imul(31, h) + pwd.charCodeAt(i) | 0;
+  return 'h' + Math.abs(h).toString(16);
+}
+
+function togglePwd() {
+  const el = document.getElementById('f-pwd');
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+
+// ─── Navigation entre étapes ─────────────────────────────────────────────────
+function goTo(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-' + n).classList.add('active');
+}
+
+function showErr(step, msg) {
+  const el = document.getElementById('e' + step + '-err');
+  if (!el) return;
+  el.textContent = msg; el.style.display = 'block';
+}
+function clearErr(step) {
+  const el = document.getElementById('e' + step + '-err');
+  if (el) { el.textContent = ''; el.style.display = 'none'; }
+}
+function showTip(msg) {
+  const el = document.getElementById('e1-tip');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+// ─── Pré-remplissage ─────────────────────────────────────────────────────────
+(function preload() {
+  const r = JSON.parse(localStorage.getItem('emp_remember') || 'null');
+  if (!r) return;
+  document.getElementById('f-id').value = r.id || '';
+  document.getElementById('f-rem').checked = true;
+  if (r.mode === 'offline') document.getElementById('m-offline').checked = true;
+})();
+
+// Enter key
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const s = document.querySelector('.step.active')?.id;
+  if (s === 'step-1') loadPostes();
+  else if (s === 'step-3') validatePwd();
+});
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
+function initFB() {
+  if (!firebase.apps.length) firebase.initializeApp({
+    apiKey: "AIzaSyAcZPCtajiuZxrDMM0CelNPRdXD-tanBxU",
+    databaseURL: "https://enterprisemanagementpro-default-rtdb.firebaseio.com",
+    projectId: "enterprisemanagementpro",
+    appId: "1:932509312427:web:6aacfe4743315c69581eee"
+  });
+  return firebase.database();
+}
+
+const withTimeout = (p, ms, msg) =>
+  Promise.race([p, new Promise((_,r) => setTimeout(() => r(new Error(msg)), ms))]);
+
+// ─── ÉTAPE 1 → 2 : Charger les postes ───────────────────────────────────────
+async function loadPostes() {
+  clearErr(1);
+  document.getElementById('e1-tip').style.display = 'none';
+
+  const id   = document.getElementById('f-id').value.trim().toLowerCase();
+  const mode = document.querySelector('input[name="mode"]:checked')?.value || 'online';
+  const rem  = document.getElementById('f-rem').checked;
+
+  if (!id) { showErr(1, 'Veuillez saisir votre ID entreprise.'); return; }
+
+  if (mode === 'online' && !navigator.onLine) {
+    showErr(1, 'Pas de connexion internet détectée.');
+    showTip('💡 Passez en mode Hors ligne pour utiliser vos données locales.');
+    return;
+  }
+
+  const btn = document.getElementById('btn-1');
+  btn.disabled = true;
+  btn.innerHTML = '<svg style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:.4rem;" class="spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,.3)" stroke-width="3"/><path d="M12 2a10 10 0 0 1 10 10" stroke="white" stroke-width="3" stroke-linecap="round"/></svg>Recherche...';
+
+  try {
+    let config;
+
+    if (mode === 'online') {
+      // Charger config depuis Firebase
+      let db;
+      try { db = initFB(); } catch(e) { throw new Error('Connexion cloud non disponible.'); }
+
+      const snap = await withTimeout(
+        db.ref(`entreprises/${id}/config`).once('value'),
+        12000,
+        'Délai dépassé (12s). Vérifiez votre réseau ou passez en mode Hors ligne.'
+      );
+      if (!snap.exists()) throw new Error("Entreprise introuvable. Vérifiez l'identifiant.");
+      config = snap.val();
+
+      // Sauvegarder en local pour le mode hors ligne
+      try {
+        await DB.init(id);
+        await DB.saveConfig(config);
+        // Aussi charger la subscription
+        const subSnap = await db.ref(`entreprises/${id}/subscription`).once('value').catch(() => ({val:()=>null}));
+        const sub = subSnap.val();
+        _loadedSub = sub;
+        if (sub) await DB.put('config', { key:'subscription', data:sub });
+      } catch(e) { console.warn('[login] DB init:', e.message); }
+
+    } else {
+      // Mode hors ligne : charger depuis IndexedDB
+      try { await DB.init(id); } catch(e) { throw new Error('Base locale inaccessible (mode privé ?).'); }
+      config = await DB.getConfig();
+      if (!config) throw new Error("Aucune donnée locale pour cet ID. Connectez-vous d'abord en ligne.");
+      const subRec = await DB.get('config','subscription').catch(()=>null);
+      _loadedSub = subRec?.data || null;
+    }
+
+    // Normaliser postes (Firebase retourne {0:{...},1:{...}} pas un tableau)
+    if (config.postes && !Array.isArray(config.postes)) {
+      config.postes = Object.values(config.postes).filter(p => p && p.id);
+    }
+    config.postes = config.postes || [];
+
+    // ── RESTRICTION PLAN LOCAL ──────────────────────────────────────
+    // Le plan LOCAL ne peut utiliser que le mode Hors ligne
+    // (Firebase réservé au backup cloud manuel 1x/24h uniquement)
+    const subData = _loadedSub || null;
+    if (subData && subData.plan === 'LOCAL' && mode === 'online') {
+      throw new Error(
+        '⚠️ Le plan Local est réservé au mode Hors ligne.\n' +
+        'Sélectionnez "Hors ligne" pour vous connecter.'
+      );
+    }
+
+    _cfg  = config;
+    _sess = { id, mode, remember: rem };
+
+    // Charger la présence (postes déjà connectés) pour afficher les badges
+    let presence = {};
+    if (mode === 'online') {
+      try {
+        const presSnap = await initFB().ref(`entreprises/${id}/presence`).once('value');
+        presence = presSnap.val() || {};
+      } catch(e) { console.warn('[presence]', e.message); }
+    }
+
+    buildPosteList(config, presence);
+    goTo(2);
+
+  } catch(err) {
+    showErr(1, err.message || 'Erreur. Réessayez.');
+    if (err.message?.includes('Délai') || err.message?.includes('réseau')) {
+      showTip('💡 Connexion lente ? Essayez le mode Hors ligne.');
+    } else if (err.message?.includes('introuvable')) {
+      showTip("💡 Vérifiez l'orthographe (lettres minuscules, chiffres, _).");
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Continuer →';
+  }
+}
+
+// ─── Construction de la liste des postes ─────────────────────────────────────
+function buildPosteList(config, presence) {
+  presence = presence || {};
+  document.getElementById('s2-company').textContent = config.name || config.id || '';
+
+  const list = document.getElementById('poste-list');
+  list.innerHTML = '';
+
+  if (!config.multiposte || config.postes.length === 0) {
+    // Pas de multiposte → afficher uniquement l'option Admin
+    const adminConnected = !!presence['admin'];
+    list.innerHTML = `
+      <div style="text-align:center;padding:.875rem 0 .25rem;color:#64748b;font-size:.8125rem;">
+        <div style="font-size:1.5rem;margin-bottom:.375rem;">🏢</div>
+        Connexion directe — mode administrateur<br>
+        <span style="font-size:.75rem;">(Multiposte non activé)</span>
+        ${adminConnected ? '<div style="margin-top:.375rem;color:#fb923c;font-size:.75rem;">● Déjà connecté</div>' : ''}
+      </div>`;
+    return;
+  }
+
+  config.postes.forEach(poste => {
+    const hasLock = !!poste.passwordHash;
+    const pc = Object.values(poste.permissions||{}).filter(Boolean).length;
+    const pt = Object.keys(poste.permissions||{}).length;
+    const isConnected = !!presence[poste.id];
+
+    const btn = document.createElement('button');
+    btn.className = 'poste-card';
+    btn.dataset.pid = poste.id;
+    btn.innerHTML = `
+      <div class="poste-avatar">
+        <svg style="width:18px;height:18px;color:#818cf8;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
+        </svg>
+      </div>
+      <div class="poste-info">
+        <div class="poste-name">${esc(poste.name)}${isConnected ? ' <span style="font-size:.7rem;color:#fb923c;font-weight:600;">● En ligne</span>' : ''}</div>
+        <div class="poste-meta">${pc}/${pt} accès activés</div>
+      </div>
+      ${hasLock ? '<span class="poste-lock" title="Protégé par mot de passe">🔒</span>' : '<svg style="width:14px;height:14px;color:#334155;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>'}
+    `;
+    btn.onclick = () => selectPoste(poste);
+    list.appendChild(btn);
+  });
+}
+
+// ─── Sélection d'un poste ────────────────────────────────────────────────────
+function selectPoste(poste) {
+  clearErr(2);
+  _curPoste = poste;
+
+  // Highlight
+  document.querySelectorAll('.poste-card').forEach(b => {
+    b.classList.toggle('selected', b.dataset.pid === poste.id);
+  });
+
+  buildStep3(poste);
+  goTo(3);
+}
+
+function selectAdmin() {
+  clearErr(2);
+  _curPoste = 'admin';
+  buildStep3('admin');
+  goTo(3);
+}
+
+// ─── Construction étape 3 ────────────────────────────────────────────────────
+function buildStep3(target) {
+  clearErr(3);
+  document.getElementById('f-pwd').value = '';
+  document.getElementById('btn-3').style.display = 'block';
+  document.getElementById('no-pwd-section').style.display = 'none';
+
+  const recap = document.getElementById('s3-poste');
+
+  if (target === 'admin') {
+    recap.innerHTML = `
+      <div style="width:40px;height:40px;border-radius:.625rem;background:rgba(99,102,241,.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <svg style="width:20px;height:20px;color:#a5b4fc;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/>
+        </svg>
+      </div>
+      <div>
+        <div style="color:#a5b4fc;font-weight:700;font-size:.9375rem;">Administrateur</div>
+        <div style="color:#64748b;font-size:.75rem;">Accès complet</div>
+      </div>`;
+    document.getElementById('s3-pwd-label').textContent = 'Mot de passe administrateur';
+    return;
+  }
+
+  // Poste normal
+  const hasLock = !!target.passwordHash;
+  recap.innerHTML = `
+    <div style="width:40px;height:40px;border-radius:.625rem;background:rgba(99,102,241,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg style="width:20px;height:20px;color:#818cf8;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
+      </svg>
+    </div>
+    <div>
+      <div style="color:#f1f5f9;font-weight:700;font-size:.9375rem;">${esc(target.name)}</div>
+      <div style="color:#64748b;font-size:.75rem;">${esc(_cfg.name || '')}</div>
+    </div>`;
+
+  if (!hasLock) {
+    // Pas de mot de passe → accès direct
+    document.getElementById('btn-3').style.display = 'none';
+    document.getElementById('no-pwd-section').style.display = 'block';
+    return;
+  }
+
+  document.getElementById('s3-pwd-label').textContent = 'Mot de passe — ' + target.name;
+}
+
+// ─── Validation du mot de passe ──────────────────────────────────────────────
+function validatePwd() {
+  clearErr(3);
+  const entered = document.getElementById('f-pwd').value;
+  if (!entered) { showErr(3, 'Veuillez saisir le mot de passe.'); return; }
+
+  const btn = document.getElementById('btn-3');
+  btn.disabled = true;
+  btn.innerHTML = '<svg style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:.4rem;" class="spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,.3)" stroke-width="3"/><path d="M12 2a10 10 0 0 1 10 10" stroke="white" stroke-width="3" stroke-linecap="round"/></svg>Vérification...';
+
+  setTimeout(() => { // micro-délai pour que le spinner s'affiche
+    const hash = hashPwd(entered);
+
+    if (_curPoste === 'admin') {
+      if (hash !== _cfg.passwordHash) {
+        showErr(3, 'Mot de passe administrateur incorrect.');
+        document.getElementById('f-pwd').value = '';
+        document.getElementById('f-pwd').focus();
+        btn.disabled = false; btn.textContent = 'Se connecter';
+        return;
+      }
+      finalize(null);
+    } else {
+      if (hash !== _curPoste.passwordHash) {
+        showErr(3, `Mot de passe incorrect pour "${_curPoste.name}".`);
+        document.getElementById('f-pwd').value = '';
+        document.getElementById('f-pwd').focus();
+        btn.disabled = false; btn.textContent = 'Se connecter';
+        return;
+      }
+      finalize(_curPoste);
+    }
+  }, 80);
+}
+
+// ─── Finalisation ────────────────────────────────────────────────────────────
+async function finalize(poste) {
+  const { id, mode, remember } = _sess;
+
+  // ── Vérification double connexion (mode online uniquement) ──────────────
+  if (mode === 'online') {
+    const posteId = poste ? poste.id : 'admin';
+    try {
+      const snap = await initFB().ref(`entreprises/${id}/presence/${posteId}`).once('value');
+      if (snap.exists()) {
+        const pres = snap.val();
+        // Vérifier si la présence est récente (heartbeat < 3 min) = vraiment connecté
+        const lastSeen = pres.lastSeen || new Date(pres.loginAt).getTime();
+        const STALE_MS = 3 * 60 * 1000;
+        if (Date.now() - lastSeen <= STALE_MS) {
+          // Utilisateur vraiment connecté — refus sans option de forcer
+          const mins = Math.round((Date.now() - new Date(pres.loginAt).getTime()) / 60000);
+          const name = poste ? esc(poste.name) : 'Administrateur';
+          showErr(3, `"${name}" est actuellement connecté (depuis ${mins} min). Fermez l'autre session pour accéder.`);
+          const btn = document.getElementById('btn-3');
+          if (btn && btn.style.display !== 'none') { btn.disabled = false; btn.textContent = 'Se connecter'; }
+          return;
+        }
+        // Présence fantôme (app fermée sans déconnexion) → effacer et continuer
+        await initFB().ref(`entreprises/${id}/presence/${posteId}`).remove().catch(() => {});
+      }
+    } catch(e) {
+      console.warn('[presence check]', e.message);
+      // En cas d'erreur Firebase, on laisse passer
+    }
+  }
+
+  sessionStorage.setItem('emp_session', JSON.stringify({
+    enterpriseId: id, mode, loginAt: new Date().toISOString()
+  }));
+
+  if (poste) {
+    sessionStorage.setItem('emp_poste', JSON.stringify(poste));
+  } else {
+    sessionStorage.removeItem('emp_poste');
+  }
+
+  if (remember) {
+    localStorage.setItem('emp_remember', JSON.stringify({ id, mode }));
+  } else {
+    localStorage.removeItem('emp_remember');
+  }
+
+  window.location.href = 'index.html';
+}
+</script>
+</body>
+</html>

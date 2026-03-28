@@ -1,0 +1,63 @@
+{
+  "name": "enterprise-management-pro",
+  "version": "1.0.0",
+  "description": "Logiciel de gestion d'entreprise",
+  "main": "main.js",
+  "author": "Enterprise Management Pro",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start":     "electron .",
+    "dist:win":  "electron-builder --win --publish never",
+    "dist:mac":  "electron-builder --mac --publish never",
+    "dist:linux":"electron-builder --linux --publish never",
+    "release":   "electron-builder --win --publish always"
+  },
+  "build": {
+    "appId":       "com.emp.enterprisemanagement",
+    "productName": "Enterprise Management Pro",
+    "copyright":   "© 2026 Enterprise Management Pro",
+    "directories": { "output": "dist-electron" },
+    "files": [
+      "**/*",
+      "!node_modules/**/*",
+      "!dist-electron/**/*",
+      "!android/**/*",
+      "!*.md",
+      "!.git/**/*"
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "icone.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Enterprise Management Pro"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "icone.png",
+      "category": "public.app-category.business"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "icone.png",
+      "category": "Office"
+    },
+    "publish": {
+      "provider": "github",
+      "owner":    "serziosky-hue",
+      "repo":     "Entreprise-Management"
+    }
+  },
+  "devDependencies": {
+    "electron":         "^29.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.0.0"
+  }
+}
