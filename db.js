@@ -1,7 +1,7 @@
 // db.js — Couche IndexedDB générique
 'use strict';
 
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 let _db = null;
 let _enterpriseId = null;
 
@@ -17,6 +17,17 @@ const STORES = [
   { name: 'config',             keyPath: 'key', indexes: [] },
   { name: 'logs',               keyPath: 'id',  indexes: [] },
   { name: 'pendingSync',        keyPath: 'id',  indexes: [] },
+  // ── Nouveaux modules métier (v4) ─────────────────────────────────────────
+  { name: 'fournisseurs',       keyPath: 'id',  indexes: [] },
+  { name: 'achats',             keyPath: 'id',  indexes: [{ name: 'date', key: 'date' }, { name: 'fournisseurId', key: 'fournisseurId' }] },
+  { name: 'caisses',            keyPath: 'id',  indexes: [{ name: 'date', key: 'date' }] },
+  { name: 'caisseMouvements',   keyPath: 'id',  indexes: [{ name: 'caisseId', key: 'caisseId' }, { name: 'date', key: 'date' }] },
+  { name: 'retours',            keyPath: 'id',  indexes: [{ name: 'date', key: 'date' }] },
+  { name: 'commandes',          keyPath: 'id',  indexes: [{ name: 'date', key: 'date' }, { name: 'status', key: 'status' }] },
+  { name: 'employes',           keyPath: 'id',  indexes: [] },
+  { name: 'presences',          keyPath: 'id',  indexes: [{ name: 'employeId', key: 'employeId' }, { name: 'date', key: 'date' }] },
+  { name: 'paies',              keyPath: 'id',  indexes: [{ name: 'employeId', key: 'employeId' }, { name: 'period', key: 'period' }] },
+  { name: 'taxConfig',          keyPath: 'id',  indexes: [] },
 ];
 
 window.DB = {

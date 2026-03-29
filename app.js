@@ -12,7 +12,7 @@ window.safeMap = (arr, fn) => Array.isArray(arr) ? arr.map(fn) : [];
 window.safeFilter = (arr, fn) => Array.isArray(arr) ? arr.filter(fn) : [];
 window.safeFind = (arr, fn) => Array.isArray(arr) ? arr.find(fn) : undefined;
 
-window.genId = (prefix = 'ID') => `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2,6)}`;
+window.genId = (prefix = 'ID') => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
 
 window.genInvoiceNum = (prefix, existingItems) => {
   const year = new Date().getFullYear();
@@ -34,14 +34,25 @@ window.formatDateTime = (dateStr) => {
   return isNaN(d) ? dateStr : d.toLocaleString('fr-FR');
 };
 
+// Convention : les montants sont toujours stockés en Ariary (Ar).
+// Si la devise affichée est Fmg, on multiplie par 5 (1 Ar = 5 Fmg).
 window.formatCurrency = (amount, currency) => {
   const cur = currency || APP?.config?.currency || 'Ar';
-  const n = parseFloat(amount) || 0;
+  let n = parseFloat(amount) || 0;
+  if (cur === 'Fmg') n = n * 5;
   // Format manually to avoid locale-specific non-breaking spaces (\u00a0 / \u202f)
   // that jsPDF renders as '/'
   const parts = Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   const sign = n < 0 ? '-' : '';
   return sign + parts + ' ' + cur;
+};
+
+// Convertit un montant Ar vers la devise d'affichage (Ar ou Fmg ×5).
+// À utiliser partout où on affiche un montant en clair (lettres, sous-totaux bruts, etc.)
+window.toDisplayAmount = (amount, currency) => {
+  const cur = currency || APP?.config?.currency || 'Ar';
+  const n = parseFloat(amount) || 0;
+  return cur === 'Fmg' ? n * 5 : n;
 };
 
 window.amountToWords = (amount) => {
@@ -224,6 +235,7 @@ window.APP = {
   _chartInstances: {},
 
   async init() {
+    this._forcedOut = false; // Réinitialiser à chaque nouvelle session
     // Afficher l'écran de chargement immédiatement
     this._showLoader('Démarrage…');
 
@@ -240,6 +252,15 @@ window.APP = {
     // Récupérer session
     const session = JSON.parse(sessionStorage.getItem('emp_session') || 'null');
     if (!session) { window.location.href = 'login.html'; return; }
+
+    // Vérifier expiration du "Se souvenir de moi"
+    const remData = JSON.parse(localStorage.getItem('emp_remember') || 'null');
+    if (remData && remData.expiresAt && Date.now() > remData.expiresAt) {
+      localStorage.removeItem('emp_remember');
+      sessionStorage.clear();
+      window.location.href = 'login.html';
+      return;
+    }
 
     // Init DB
     this._updateLoader(null, 'Ouverture de la base de données…');
@@ -328,7 +349,22 @@ window.APP = {
         this._presHeartbeat = setInterval(() => {
           FM._ref(`presence/${posteId}/lastSeen`).set(Date.now()).catch(() => {});
         }, 2 * 60 * 1000);
+
+        // Éviction : si quelqu'un d'autre se connecte sur le même poste → déconnecter
+        const myLoginAt = session.loginAt;
+        FM._ref(`presence/${posteId}`).on('value', snap => {
+          if (!snap.exists() || this._forcedOut) return;
+          const pres = snap.val();
+          if (pres.loginAt && pres.loginAt !== myLoginAt) {
+            this._forceLogout('Ce poste a été pris en charge par une autre session. Vous avez été déconnecté.');
+          }
+        });
       } catch(e) { console.warn('[presence write]', e); }
+
+      // Déconnexion automatique si internet coupé (mode online)
+      window.addEventListener('offline', () => {
+        this._forceLogout('Connexion internet perdue. Vous avez été déconnecté automatiquement.');
+      });
     }
 
     // Sync au démarrage puis lancer le temps réel
@@ -376,6 +412,64 @@ window.APP = {
     setInterval(() => this.refreshBadges(), 60000);
   },
 
+  // ─── Déconnexion forcée (sans confirmation) ──────────────────────────────
+  _forceLogout(reason) {
+    if (this._forcedOut) return;
+    this._forcedOut = true;
+
+    clearInterval(this._presHeartbeat);
+    try {
+      const session = JSON.parse(sessionStorage.getItem('emp_session') || 'null');
+      if (session?.mode === 'online' && FM?.db) {
+        FM._ref(`presence/${this.currentPoste?.id || 'admin'}`).remove().catch(() => {});
+      }
+    } catch(e) {}
+    try { SM.stopRealtimeSync(); FM.detachAll(); } catch(e) {}
+    sessionStorage.clear();
+
+    // Overlay plein écran avec message et barre de progression
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.97);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.75rem;font-family:system-ui,-apple-system,sans-serif;';
+    ov.innerHTML = `
+      <div style="font-size:2.5rem;margin-bottom:.25rem;">🔐</div>
+      <div style="color:#f1f5f9;font-size:1rem;font-weight:600;text-align:center;max-width:340px;padding:0 1.5rem;">${reason}</div>
+      <div style="color:#64748b;font-size:.8125rem;">Redirection vers la page de connexion…</div>
+      <div style="width:200px;height:3px;background:#1e293b;border-radius:2px;margin-top:.75rem;overflow:hidden;">
+        <div style="height:100%;width:0;background:#6366f1;border-radius:2px;transition:width 3s linear;" id="_fl_bar"></div>
+      </div>`;
+    document.body.appendChild(ov);
+    requestAnimationFrame(() => {
+      const bar = document.getElementById('_fl_bar');
+      if (bar) bar.style.width = '100%';
+    });
+    setTimeout(() => { window.location.href = 'login.html'; }, 3100);
+  },
+
+  // ─── Modes de paiement ───────────────────────────────────────────────────
+  _PM_DEFAULTS: [
+    { id: 'cash',   label: 'Espèces',        icon: '💵', isDefault: true },
+    { id: 'mobile', label: 'Mobile Money',   icon: '📱', isDefault: true },
+    { id: 'card',   label: 'Carte bancaire', icon: '💳', isDefault: true },
+    { id: 'cheque', label: 'Chèque',         icon: '📄', isDefault: true },
+    { id: 'credit', label: 'Crédit',         icon: '📋', isDefault: true },
+  ],
+
+  getPaymentMethods() {
+    return (this.config?.paymentMethods && this.config.paymentMethods.length > 0)
+      ? this.config.paymentMethods
+      : this._PM_DEFAULTS;
+  },
+
+  getPaymentLabel(id) {
+    const m = this.getPaymentMethods().find(m => m.id === id);
+    return m ? m.label : (id || '—');
+  },
+
+  getPaymentIcon(id) {
+    const m = this.getPaymentMethods().find(m => m.id === id);
+    return m ? (m.icon || '💰') : '💰';
+  },
+
   // ─── Version & Mises à jour ──────────────────────────────────────────────
   _APP_VERSION: '1.0.0',
 
@@ -406,7 +500,7 @@ window.APP = {
 
   // Injecter les points rouges dans tous les nav items
   _initNewDots() {
-    const TABS = ['dashboard','stock','sales','proformas','clients','credits','expenses','reports','logs','settings'];
+    const TABS = ['dashboard','stock','sales','proformas','clients','credits','expenses','reports','logs','settings','suppliers','orders','cashier','returns','hr','tax'];
     TABS.forEach(tab => {
       document.querySelectorAll(`[data-tab="${tab}"]`).forEach(el => {
         if (el.querySelector('[data-ndot]')) return;
@@ -590,7 +684,6 @@ window.APP = {
       window._delPinResolve = resolve;
       window._validateDelPin = () => {
         const entered = document.getElementById('del-pin-input')?.value || '';
-        const { hashPassword } = window;
         // hashPassword est dans firebase-manager comme FM.hashPassword
         let hash;
         if (typeof FM !== 'undefined') hash = FM.hashPassword(entered);
@@ -642,8 +735,8 @@ window.APP = {
   },
 
   _allPermissions() {
-    const tabs = ['dashboard','stock','sales','clients','credits','expenses','reports','logs','settings','proformas'];
-    const actions = ['stockAdd','stockEdit','stockDelete','stockAdjust','salesCreate','salesCancel','creditsPay','creditsDelete','expensesAdd','expensesEdit','expensesDelete','configCompany','configSecurity','configData','configPostes'];
+    const tabs = ['dashboard','stock','sales','clients','credits','expenses','reports','logs','settings','proformas','suppliers','orders','cashier','returns','hr','tax'];
+    const actions = ['stockAdd','stockEdit','stockDelete','stockAdjust','salesCreate','salesCancel','creditsPay','creditsDelete','expensesAdd','expensesEdit','expensesDelete','configCompany','configSecurity','configData','configPostes','suppliersAdd','ordersCreate','cashierOpen','returnsCreate','hrManage','taxConfig'];
     const p = {};
     [...tabs, ...actions].forEach(k => p[k] = true);
     return p;
@@ -659,8 +752,44 @@ window.APP = {
     return this.canDo(tab);
   },
 
+  _showUpgradePrompt(tab) {
+    const labels = {
+      suppliers: 'Fournisseurs & Achats',
+      orders:    'Commandes',
+      cashier:   'Caisse',
+      returns:   'Retours & Avoirs',
+      hr:        'Ressources Humaines',
+      tax:       'TVA / Taxes'
+    };
+    showModal(`
+      <div class="p-6 text-center">
+        <div class="text-4xl mb-3">🚀</div>
+        <h3 class="text-lg font-bold text-white mb-2">Fonctionnalité PRO</h3>
+        <p class="text-gray-300 text-sm mb-4">
+          <strong class="text-indigo-400">${escapeHtml(labels[tab] || tab)}</strong>
+          est disponible uniquement avec le plan <strong class="text-indigo-400">PRO</strong>.
+        </p>
+        <p class="text-gray-500 text-xs mb-5">Passez au plan PRO pour débloquer les modules avancés : Fournisseurs, Commandes, Caisse, Retours, RH et TVA.</p>
+        <div class="flex gap-3 justify-center">
+          <button onclick="closeModal()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm">Fermer</button>
+          <button onclick="closeModal(); SUBS.showPlans();" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold">Voir les offres</button>
+        </div>
+      </div>`);
+  },
+
   async switchTab(tab) {
     if (!this._canAccess(tab)) { showToast('Accès non autorisé', 'warning'); return; }
+
+    // Restriction plan PREMIUM
+    const PRO_TABS = ['suppliers','orders','cashier','returns','hr','tax'];
+    if (PRO_TABS.includes(tab)) {
+      const plan = APP.subscription?.data?.plan || APP.subscription?.plan;
+      if (plan !== 'PREMIUM') {
+        this._showUpgradePrompt(tab);
+        return;
+      }
+    }
+
     this._activeTab = tab;
 
     // Mettre à jour nav (sidebar + bottom nav mobile)
@@ -694,7 +823,13 @@ window.APP = {
       proformas: () => PROFORMA?.render(),
       reports: () => REPORTS?.render(),
       logs: () => LOGS?.render(),
-      settings: () => CONFIG_MOD?.render()
+      settings: () => CONFIG_MOD?.render(),
+      suppliers: () => SUPPLIERS?.render(),
+      orders: () => ORDERS?.render(),
+      cashier: () => CASHIER?.render(),
+      returns: () => RETURNS?.render(),
+      hr: () => HR?.render(),
+      tax: () => TAX?.render()
     };
 
     // Marquer l'onglet comme vu (cache le point rouge)
@@ -751,6 +886,15 @@ window.APP = {
         el.textContent = lateCredits > 0 ? lateCredits : '';
         el.classList.toggle('badge-alert', lateCredits > 0);
         el.style.display = lateCredits > 0 ? '' : 'none';
+      });
+
+      // Commandes en attente (new + confirmed + in_progress)
+      const commandes = await DB.getAll('commandes');
+      const pendingOrders = safeFilter(commandes, c => ['new','confirmed','in_progress'].includes(c.status)).length;
+      document.querySelectorAll('[id^="badge-orders"]').forEach(el => {
+        el.textContent = pendingOrders > 0 ? pendingOrders : '';
+        el.classList.toggle('badge-alert', pendingOrders > 0);
+        el.style.display = pendingOrders > 0 ? '' : 'none';
       });
     } catch (e) { /* silencieux */ }
   }

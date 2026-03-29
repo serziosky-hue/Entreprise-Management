@@ -12,9 +12,9 @@
       if (!isDark) document.documentElement.classList.add('light');
     })();
   </script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="libs/tailwindcss.min.js"></script>
+  <script src="libs/firebase-app-compat.js"></script>
+  <script src="libs/firebase-database-compat.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -169,10 +169,11 @@
       </div>
 
       <!-- Se souvenir -->
-      <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;margin-bottom:1rem;">
+      <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;margin-bottom:.5rem;">
         <input id="f-rem" type="checkbox" style="width:15px;height:15px;accent-color:#6366f1;">
-        <span style="font-size:.8125rem;color:#94a3b8;">Se souvenir de moi</span>
+        <span style="font-size:.8125rem;color:#94a3b8;">Se souvenir de moi <span style="color:#64748b;font-size:.75rem;">(30 jours)</span></span>
       </label>
+      <div id="rem-info" style="display:none;font-size:.75rem;color:#6ee7b7;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:.375rem;padding:.375rem .625rem;margin-bottom:.875rem;"></div>
 
       <button id="btn-1" class="btn btn-primary" onclick="loadPostes()">Continuer →</button>
 
@@ -257,6 +258,17 @@
   <p style="text-align:center;color:#1e293b;font-size:.625rem;margin-top:.75rem;">Enterprise Management Pro v1.0</p>
 </div><!-- /wrap -->
 
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- Overlay connexion automatique                                  -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="auto-overlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.97);z-index:9999;flex-direction:column;align-items:center;justify-content:center;gap:.75rem;">
+  <div style="width:46px;height:46px;border:3px solid rgba(99,102,241,.25);border-top-color:#6366f1;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:.25rem;"></div>
+  <div id="auto-msg" style="color:#f1f5f9;font-size:1rem;font-weight:600;text-align:center;max-width:300px;padding:0 1rem;"></div>
+  <div id="auto-sub" style="color:#64748b;font-size:.8125rem;text-align:center;max-width:300px;padding:0 1rem;"></div>
+  <div id="auto-err" style="display:none;color:#fca5a5;font-size:.8125rem;text-align:center;max-width:300px;padding:.5rem .875rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:.5rem;margin-top:.25rem;"></div>
+  <button onclick="cancelAutoLogin()" style="margin-top:1.25rem;padding:.5rem 1.25rem;background:transparent;border:1px solid #334155;color:#94a3b8;border-radius:.5rem;cursor:pointer;font-size:.8125rem;" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#334155';this.style.color='#94a3b8'">Utiliser un autre compte</button>
+</div>
+
 <script src="db.js"></script>
 <script>
 'use strict';
@@ -305,10 +317,173 @@ function showTip(msg) {
 (function preload() {
   const r = JSON.parse(localStorage.getItem('emp_remember') || 'null');
   if (!r) return;
+
+  // Vérification expiration (30 jours)
+  if (r.expiresAt && Date.now() > r.expiresAt) {
+    localStorage.removeItem('emp_remember');
+    return;
+  }
+
   document.getElementById('f-id').value = r.id || '';
   document.getElementById('f-rem').checked = true;
-  if (r.mode === 'offline') document.getElementById('m-offline').checked = true;
+
+  // Restaurer le mode (online ou offline)
+  const modeEl = document.getElementById(r.mode === 'offline' ? 'm-offline' : 'm-online');
+  if (modeEl) modeEl.checked = true;
+
+  // Afficher le bandeau d'info
+  const daysLeft = r.expiresAt ? Math.ceil((r.expiresAt - Date.now()) / 86400000) : null;
+  const info = document.getElementById('rem-info');
+  if (info) {
+    let parts = ['✓ ID mémorisé'];
+    if (r.posteName) parts.push('Poste : <strong>' + r.posteName + '</strong>');
+    if (daysLeft !== null) parts.push('Expire dans ' + daysLeft + 'j');
+    info.innerHTML = parts.join(' &nbsp;·&nbsp; ');
+    info.style.display = 'block';
+  }
+  // Déclencher la connexion automatique après le rendu
+  setTimeout(tryAutoLogin, 250);
 })();
+
+// ─── Connexion automatique ───────────────────────────────────────────────────
+function cancelAutoLogin() {
+  document.getElementById('auto-overlay').style.display = 'none';
+}
+
+async function tryAutoLogin() {
+  const r = JSON.parse(localStorage.getItem('emp_remember') || 'null');
+  if (!r || !r.id) return;
+
+  // Vérifier expiration
+  if (r.expiresAt && Date.now() > r.expiresAt) {
+    localStorage.removeItem('emp_remember');
+    return;
+  }
+
+  // Afficher l'overlay
+  const overlay  = document.getElementById('auto-overlay');
+  const msgEl    = document.getElementById('auto-msg');
+  const subEl    = document.getElementById('auto-sub');
+  const errEl    = document.getElementById('auto-err');
+  overlay.style.display = 'flex';
+  errEl.style.display = 'none';
+  msgEl.textContent = r.posteName ? `Reconnexion : "${r.posteName}"` : 'Connexion automatique…';
+  subEl.textContent = r.mode === 'offline' ? 'Mode hors ligne · Chargement local…' : 'Mode en ligne · Connexion au cloud…';
+
+  function setStep(msg) { subEl.textContent = msg; }
+
+  try {
+    // Mode online : vérifier internet
+    if (r.mode === 'online' && !navigator.onLine) {
+      throw new Error('Pas de connexion internet. Passez en mode Hors ligne ou vérifiez votre réseau.');
+    }
+
+    let config, sub = null;
+
+    if (r.mode === 'online') {
+      setStep('Récupération de la configuration cloud…');
+      let db;
+      try { db = initFB(); } catch(e) { throw new Error('Service cloud indisponible.'); }
+      const snap = await withTimeout(
+        db.ref(`entreprises/${r.id}/config`).once('value'),
+        12000,
+        'Délai dépassé (12s). Vérifiez votre réseau ou passez en mode Hors ligne.'
+      );
+      if (!snap.exists()) throw new Error('Entreprise introuvable. Données invalides.');
+      config = snap.val();
+      try {
+        await DB.init(r.id);
+        await DB.saveConfig(config);
+        const subSnap = await db.ref(`entreprises/${r.id}/subscription`).once('value').catch(() => ({ val: () => null }));
+        sub = subSnap.val();
+        if (sub) await DB.put('config', { key: 'subscription', data: sub });
+      } catch(e) { console.warn('[auto-login] DB save:', e.message); }
+    } else {
+      setStep('Chargement des données locales…');
+      try { await DB.init(r.id); } catch(e) { throw new Error('Base de données locale inaccessible.'); }
+      config = await DB.getConfig();
+      if (!config) throw new Error("Aucune donnée locale pour cet ID. Connectez-vous d'abord en ligne.");
+      const subRec = await DB.get('config', 'subscription').catch(() => null);
+      sub = subRec?.data || null;
+    }
+
+    // Normaliser postes
+    if (config.postes && !Array.isArray(config.postes)) {
+      config.postes = Object.values(config.postes).filter(p => p && p.id);
+    }
+    config.postes = config.postes || [];
+
+    // Trouver le poste mémorisé
+    let poste = null;
+    if (r.posteId && config.multiposte && config.postes.length > 0) {
+      poste = config.postes.find(p => p.id === r.posteId) || null;
+    }
+
+    _cfg      = config;
+    _loadedSub = sub;
+    _sess     = { id: r.id, mode: r.mode, remember: true };
+
+    // Vérifier disponibilité du poste (mode online uniquement)
+    if (r.mode === 'online' && poste) {
+      setStep('Vérification de disponibilité du poste…');
+      try {
+        const presSnap = await initFB().ref(`entreprises/${r.id}/presence/${poste.id}`).once('value');
+        if (presSnap.exists()) {
+          const pres = presSnap.val();
+          const STALE_MS = 3 * 60 * 1000;
+          if (Date.now() - (pres.lastSeen || new Date(pres.loginAt).getTime()) <= STALE_MS) {
+            const mins = Math.round((Date.now() - new Date(pres.loginAt).getTime()) / 60000);
+            throw new Error(`Le poste "${poste.name}" est déjà utilisé (depuis ${mins} min). Fermez l'autre session d'abord.`);
+          }
+          // Présence fantôme → nettoyer
+          await initFB().ref(`entreprises/${r.id}/presence/${poste.id}`).remove().catch(() => {});
+        }
+      } catch(e) {
+        if (e.message.includes('déjà utilisé')) throw e;
+        console.warn('[auto-login] presence check:', e.message);
+      }
+    }
+
+    // Si le poste a un mot de passe → sauter vers l'étape 3
+    if (poste && poste.passwordHash) {
+      overlay.style.display = 'none';
+      _curPoste = poste;
+      const s3 = document.getElementById('s3-poste');
+      s3.innerHTML = `
+        <div class="poste-avatar">
+          <svg style="width:18px;height:18px;color:#818cf8;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
+          </svg>
+        </div>
+        <div class="poste-info">
+          <div class="poste-name">${esc(poste.name)}</div>
+          <div class="poste-meta">Mot de passe requis</div>
+        </div>
+        <span class="poste-lock" title="Protégé par mot de passe">🔒</span>`;
+      document.getElementById('no-pwd-section').style.display = 'none';
+      document.getElementById('f-pwd').closest('div').style.display = '';
+      document.getElementById('btn-3').style.display = '';
+      goTo(3);
+      setTimeout(() => document.getElementById('f-pwd').focus(), 100);
+      return;
+    }
+
+    // Pas de mot de passe → finaliser directement
+    setStep('Ouverture de l\'application…');
+    await finalize(poste);
+
+  } catch(err) {
+    errEl.textContent = err.message || 'Connexion automatique échouée.';
+    errEl.style.display = 'block';
+    msgEl.textContent = 'Connexion automatique échouée';
+    subEl.textContent = 'Cliquez sur "Utiliser un autre compte" ou patientez…';
+    // Rester sur l'overlay 4s puis revenir au formulaire normal
+    setTimeout(() => {
+      overlay.style.display = 'none';
+      showErr(1, err.message || 'Connexion automatique échouée. Connectez-vous manuellement.');
+    }, 4000);
+  }
+}
 
 // Enter key
 document.addEventListener('keydown', e => {
@@ -479,6 +654,13 @@ function buildPosteList(config, presence) {
     btn.onclick = () => selectPoste(poste);
     list.appendChild(btn);
   });
+
+  // Pré-sélectionner le poste mémorisé
+  const r = JSON.parse(localStorage.getItem('emp_remember') || 'null');
+  if (r && r.posteId) {
+    const remembered = config.postes.find(p => p.id === r.posteId);
+    if (remembered) selectPoste(remembered);
+  }
 }
 
 // ─── Sélection d'un poste ────────────────────────────────────────────────────
@@ -627,7 +809,14 @@ async function finalize(poste) {
   }
 
   if (remember) {
-    localStorage.setItem('emp_remember', JSON.stringify({ id, mode }));
+    localStorage.setItem('emp_remember', JSON.stringify({
+      id,
+      mode,
+      posteId:   poste ? poste.id   : null,
+      posteName: poste ? poste.name : null,
+      savedAt:   Date.now(),
+      expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000
+    }));
   } else {
     localStorage.removeItem('emp_remember');
   }

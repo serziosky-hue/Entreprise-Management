@@ -250,10 +250,7 @@ window.CREDITS = {
           <div>
             <label class="text-xs text-gray-400">Mode de paiement</label>
             <select id="pay-mode" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm mt-1">
-              <option value="cash">Espèces</option>
-              <option value="mobile">Mobile Money</option>
-              <option value="card">Carte</option>
-              <option value="cheque">Chèque</option>
+              ${APP.getPaymentMethods().filter(m => m.id !== 'credit').map(m => `<option value="${m.id}">${m.icon} ${m.label}</option>`).join('')}
             </select>
           </div>
           <div>
@@ -287,6 +284,12 @@ window.CREDITS = {
     closeModal();
     await DB.put('credits', c);
     await SM.writeNow('credits', c.id, 'set', c);
+    
+    // Enregistrer en caisse si caisse ouverte (entrée)
+    if (typeof CASHIER !== 'undefined' && CASHIER._activeCaisseId) {
+      await CASHIER.recordCreditPaymentMouvement(c, amount, mode);
+    }
+    
     await APP.addLog('SUCCESS', `Paiement crédit: ${c.clientName} +${formatCurrency(amount)}`, { creditId, amount, mode });
     showToast(`Paiement de ${formatCurrency(amount)} enregistré`, 'success');
     this.render();

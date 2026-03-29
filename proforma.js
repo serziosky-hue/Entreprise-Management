@@ -458,6 +458,7 @@ window.PROFORMA = {
 
   generatePDF(pro) {
     const config = APP.config || {};
+    const currency = config.currency || 'Ar';
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     const pageW = doc.internal.pageSize.getWidth();
@@ -494,7 +495,7 @@ window.PROFORMA = {
     doc.autoTable({
       startY: 72,
       head: [['Désignation', 'Qté', 'Prix unitaire', 'Total']],
-      body: (pro.items || []).map(i => [i.nom, i.qty + (i.unite ? ' ' + i.unite : ''), formatCurrency(i.price), formatCurrency(i.total)]),
+      body: (pro.items || []).map(i => [i.nom, i.qty + (i.unite ? ' ' + i.unite : ''), formatCurrency(i.price, currency), formatCurrency(i.total, currency)]),
       styles: { fontSize: 9, cellPadding: 4, overflow: 'ellipsize' },
       headStyles: { fillColor: [99, 102, 241], textColor: [255, 255, 255] },
       columnStyles: {
@@ -508,17 +509,17 @@ window.PROFORMA = {
     const finalY = doc.lastAutoTable.finalY + 8;
     const rightX = pageW - 14;
     doc.setFontSize(10);
-    doc.text('Sous-total:', rightX - 50, finalY, { align: 'right' }); doc.text(formatCurrency(pro.subtotal), rightX, finalY, { align: 'right' });
+    doc.text('Sous-total:', rightX - 50, finalY, { align: 'right' }); doc.text(formatCurrency(pro.subtotal, currency), rightX, finalY, { align: 'right' });
     if (pro.remise > 0) {
       doc.setTextColor(200, 50, 50);
-      doc.text('Remise:', rightX - 50, finalY + 7, { align: 'right' }); doc.text('-' + formatCurrency(pro.remise), rightX, finalY + 7, { align: 'right' });
+      doc.text('Remise:', rightX - 50, finalY + 7, { align: 'right' }); doc.text('-' + formatCurrency(pro.remise, currency), rightX, finalY + 7, { align: 'right' });
       doc.setTextColor(0, 0, 0);
     }
     doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-    doc.text('TOTAL:', rightX - 50, finalY + 15, { align: 'right' }); doc.text(formatCurrency(pro.total), rightX, finalY + 15, { align: 'right' });
+    doc.text('TOTAL:', rightX - 50, finalY + 15, { align: 'right' }); doc.text(formatCurrency(pro.total, currency), rightX, finalY + 15, { align: 'right' });
 
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(100, 100, 100);
-    doc.text('Arrêté à : ' + amountToWords(pro.total) + ' ' + (config.currency || 'Ariary'), 14, finalY + 25);
+    doc.text('Arrêté à : ' + amountToWords(toDisplayAmount(pro.total)) + ' ' + (config.currency || 'Ariary'), 14, finalY + 25);
 
     if (pro.notes) {
       doc.text('Conditions :', 14, finalY + 35);

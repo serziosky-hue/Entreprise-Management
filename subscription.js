@@ -604,5 +604,93 @@ window.SUBS = {
     const elapsed = Date.now() - parseInt(lastBackup);
     const remaining = (24 * 3600 * 1000) - elapsed;
     return Math.max(0, Math.ceil(remaining / 3600000)); // heures restantes
-  }
+  },
+
+  // ─── Afficher les offres / upgrade (depuis modale PRO) ───────────────────
+  showPlans() {
+    const sub = this._sub();
+    const curPlan = sub?.plan || 'BASIC';
+    const plans = this.PLANS;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'plans-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9100;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.95);padding:1rem;overflow-y:auto;';
+
+    overlay.innerHTML = `
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:1.25rem;padding:1.5rem;max-width:460px;width:100%;box-shadow:0 24px 48px rgba(0,0,0,.7);max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+          <h3 style="color:#f1f5f9;font-weight:700;font-size:1.05rem;">🚀 Passer au plan Premium</h3>
+          <button onclick="document.getElementById('plans-overlay').remove()" style="background:rgba(51,65,85,.5);border:1px solid #334155;border-radius:.5rem;width:30px;height:30px;cursor:pointer;color:#94a3b8;font-size:1.1rem;line-height:1;">×</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.375rem;margin-bottom:1rem;">
+          ${Object.entries(plans).map(([k,p]) => `
+            <label style="cursor:pointer;">
+              <input type="radio" name="up-plan" value="${k}" ${k==='PREMIUM'?'checked':''} style="display:none;">
+              <div class="up-plan-card" data-plan="${k}" style="border:2px solid ${k==='PREMIUM'?'#6366f1':'#334155'};border-radius:.75rem;padding:.625rem;text-align:center;background:${k==='PREMIUM'?'rgba(99,102,241,.12)':'rgba(15,23,42,.5)'};cursor:pointer;transition:all .15s;"
+                onclick="document.querySelectorAll('.up-plan-card').forEach(c=>c.dataset.plan!=='${k}'&&(c.style.borderColor='#334155',c.style.background='rgba(15,23,42,.5)'));this.style.borderColor='#6366f1';this.style.background='rgba(99,102,241,.12)';this.closest('label').querySelector('input').checked=true;SUBS._updatePlansOverlayAmount();">
+                ${k==='PREMIUM'?'<div style="color:#fbbf24;font-size:9px;font-weight:700;margin-bottom:2px;">RECOMMANDÉ</div>':''}
+                <div style="color:#f1f5f9;font-weight:700;font-size:.8125rem;">${p.label}</div>
+                <div style="color:#818cf8;font-weight:800;font-size:.9375rem;">${p.price>0?p.price.toLocaleString()+' Ar':'Gratuit'}</div>
+                <div style="color:#64748b;font-size:.5625rem;">${p.unit}</div>
+                ${k===curPlan?'<div style="color:#34d399;font-size:.5625rem;margin-top:2px;">Plan actuel</div>':''}
+              </div>
+            </label>`).join('')}
+        </div>
+
+        <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:.75rem;padding:.75rem;margin-bottom:.875rem;font-size:.8rem;">
+          <div style="color:#a5b4fc;font-weight:700;margin-bottom:.375rem;">📱 Envoyez à :</div>
+          <div style="color:#cbd5e1;display:flex;justify-content:space-between;"><span>🟢 Mvola</span><strong>034 XX XXX XX</strong></div>
+          <div style="color:#cbd5e1;display:flex;justify-content:space-between;margin-top:.25rem;"><span>🟠 Orange Money</span><strong>032 XX XXX XX</strong></div>
+          <div style="color:#cbd5e1;display:flex;justify-content:space-between;margin-top:.25rem;"><span>🔴 Airtel Money</span><strong>033 XX XXX XX</strong></div>
+          <div id="up-ovl-amount" style="margin-top:.5rem;padding:.375rem .625rem;background:rgba(99,102,241,.15);border-radius:.5rem;text-align:center;color:#a5b4fc;font-weight:700;">
+            Montant : ${(plans['PREMIUM']?.price||0).toLocaleString()} Ar
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:.875rem;">
+          <select id="up-ovl-op" style="padding:.625rem .875rem;border-radius:.625rem;border:1.5px solid #334155;background:#0f172a;color:#f1f5f9;font-size:.875rem;outline:none;width:100%;">
+            <option value="">Opérateur Mobile Money...</option>
+            <option value="MVOLA">🔴 Mvola (Telma)</option>
+            <option value="ORANGE_MONEY">🟠 Orange Money</option>
+            <option value="AIRTEL_MONEY">🔵 Airtel Money</option>
+          </select>
+          <input id="up-ovl-phone" type="tel" placeholder="Votre numéro (ex: 034 XX XXX XX)"
+            style="padding:.625rem .875rem;border-radius:.625rem;border:1.5px solid #334155;background:#0f172a;color:#f1f5f9;font-size:.875rem;outline:none;width:100%;box-sizing:border-box;">
+          <input id="up-ovl-ref" type="text" placeholder="Référence de transaction Mobile Money"
+            style="padding:.625rem .875rem;border-radius:.625rem;border:1.5px solid #334155;background:#0f172a;color:#f1f5f9;font-size:.875rem;outline:none;width:100%;box-sizing:border-box;">
+        </div>
+        <button onclick="SUBS._submitPlansOverlay()" style="width:100%;padding:.75rem;background:#4f46e5;color:white;border:none;border-radius:.75rem;font-weight:700;font-size:.875rem;cursor:pointer;">
+          Envoyer la demande
+        </button>
+        <p style="color:#475569;font-size:.7rem;text-align:center;margin-top:.75rem;">Votre accès sera activé dans les 24h après vérification du paiement.</p>
+      </div>`;
+
+    document.body.appendChild(overlay);
+  },
+
+  _updatePlansOverlayAmount() {
+    const plan = document.querySelector('[name="up-plan"]:checked')?.value;
+    const price = this.PLANS[plan]?.price || 0;
+    const el = document.getElementById('up-ovl-amount');
+    if (el) el.textContent = 'Montant : ' + price.toLocaleString() + ' Ar';
+  },
+
+  async _submitPlansOverlay() {
+    const plan = document.querySelector('[name="up-plan"]:checked')?.value;
+    const op   = document.getElementById('up-ovl-op')?.value;
+    const phone= document.getElementById('up-ovl-phone')?.value?.trim();
+    const ref  = document.getElementById('up-ovl-ref')?.value?.trim();
+
+    if (!plan || !op || !phone || !ref) {
+      showToast('Remplissez tous les champs', 'warning'); return;
+    }
+    try {
+      await this._submitRenewalRequest({ plan, operator: op, phone, transactionRef: ref });
+      document.getElementById('plans-overlay')?.remove();
+      showToast('Demande envoyée ! Activation sous 24h.', 'success');
+    } catch(e) {
+      showToast('Erreur : ' + e.message, 'error');
+    }
+  },
 };

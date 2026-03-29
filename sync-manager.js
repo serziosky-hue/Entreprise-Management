@@ -13,7 +13,8 @@ window.SM = {
 
   REALTIME_COLLECTIONS: [
     'produits', 'ventes', 'depenses', 'credits',
-    'clients', 'proformas', 'stockMovements', 'amortizedExpenses'
+    'clients', 'proformas', 'stockMovements', 'amortizedExpenses',
+    'fournisseurs', 'commandes', 'employes'
   ],
 
   // ─── Init ─────────────────────────────────────────────────────────────────
@@ -197,11 +198,11 @@ window.SM = {
   // Notification toast + re-render de l'onglet actif + badges
   _notifyAndRefresh(collection) {
     this._scheduleRefresh(collection);
-    if (['produits', 'credits'].includes(collection)) APP?.refreshBadges?.();
+    if (['produits', 'credits', 'commandes'].includes(collection)) APP?.refreshBadges?.();
     const now = Date.now();
     if (now - this._lastNotif > 4000) {
       this._lastNotif = now;
-      const labels = { produits:'Stock', ventes:'Ventes', depenses:'Dépenses', credits:'Crédits', clients:'Clients', proformas:'Devis', stockMovements:'Stock', amortizedExpenses:'Dépenses' };
+      const labels = { produits:'Stock', ventes:'Ventes', depenses:'Dépenses', credits:'Crédits', clients:'Clients', proformas:'Devis', stockMovements:'Stock', amortizedExpenses:'Dépenses', fournisseurs:'Fournisseurs', commandes:'Commandes', employes:'Employés' };
       if (typeof showToast !== 'undefined') showToast(`↻ ${labels[collection] || collection} synchronisé`, 'info', 2000);
     }
   },
@@ -240,7 +241,10 @@ window.SM = {
     produits: 'stock', stockMovements: 'stock',
     ventes: 'sales', credits: 'credits',
     depenses: 'expenses', amortizedExpenses: 'expenses',
-    clients: 'clients', proformas: 'proformas'
+    clients: 'clients', proformas: 'proformas',
+    fournisseurs: 'suppliers', achats: 'suppliers',
+    commandes: 'orders', retours: 'returns',
+    employes: 'hr', presences: 'hr', paies: 'hr'
   },
 
   _scheduleRefresh(collection) {
@@ -262,6 +266,10 @@ window.SM = {
         expenses: () => EXPENSES?.render(),
         clients: () => CLIENTS?.render(),
         proformas: () => PROFORMA?._view === 'list' ? PROFORMA._renderList() : Promise.resolve(),
+        suppliers: () => SUPPLIERS?.render(),
+        orders: () => ORDERS?.render(),
+        returns: () => RETURNS?.render(),
+        hr: () => HR?.render(),
       };
       try {
         if (renderers[active]) await renderers[active]();
@@ -297,7 +305,7 @@ window.SM = {
     this._setSyncing(true);
 
     // Collections historiques : on limite à 90 jours pour réduire la bande passante
-    const HISTORY_COLS = new Set(['ventes', 'depenses', 'stockMovements']);
+    const HISTORY_COLS = new Set(['ventes', 'depenses', 'stockMovements', 'achats', 'retours']);
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - 90);
     const cutoff = cutoffDate.toISOString().split('T')[0]; // 'YYYY-MM-DD'

@@ -78,20 +78,19 @@ window.SALES = {
             <div class="flex flex-wrap gap-2 items-center">
               <label class="text-xs text-gray-400 w-24 sm:w-28">Mode paiement</label>
               <select id="sale-mode" onchange="SALES._onModeChange()" class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-sm">
-                <option value="cash">Espèces</option>
-                <option value="mobile">Mobile Money</option>
-                <option value="card">Carte bancaire</option>
-                <option value="credit">Crédit</option>
+                ${APP.getPaymentMethods().map(m => `<option value="${m.id}">${m.icon} ${m.label}</option>`).join('')}
               </select>
             </div>
             <div id="credit-fields" class="hidden space-y-2">
               <div class="flex gap-2 items-center">
                 <label class="text-xs text-gray-400 w-28">Client *</label>
-                <div class="flex-1 relative">
-                  <select id="sale-client" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-sm">
+                <div class="flex gap-1 flex-1">
+                  <select id="sale-client" class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-sm">
                     <option value="">Sélectionner client</option>
                     ${clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)} ${c.phone?'('+escapeHtml(c.phone)+')':''}</option>`).join('')}
                   </select>
+                  <button type="button" onclick="SALES._quickAddClient('sale-client')" title="Ajouter un client"
+                    class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-bold leading-none transition-colors flex-shrink-0">+</button>
                 </div>
               </div>
               <div class="flex gap-2 items-center">
@@ -101,10 +100,14 @@ window.SALES = {
             </div>
             <div id="client-field" class="flex gap-2 items-center">
               <label class="text-xs text-gray-400 w-28">Client</label>
-              <select id="sale-client-gen" class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-sm">
-                <option value="">Client passager</option>
-                ${clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
-              </select>
+              <div class="flex gap-1 flex-1">
+                <select id="sale-client-gen" class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-sm">
+                  <option value="">Client passager</option>
+                  ${clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
+                </select>
+                <button type="button" onclick="SALES._quickAddClient('sale-client-gen')" title="Ajouter un client"
+                  class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-bold leading-none transition-colors flex-shrink-0">+</button>
+              </div>
             </div>
             <div class="flex flex-wrap gap-2 items-center">
               <label class="text-xs text-gray-400 w-24 sm:w-28">Date</label>
@@ -146,6 +149,24 @@ window.SALES = {
     const days = APP.config?.creditDelayDays || 30;
     const d = new Date(); d.setDate(d.getDate() + days);
     return d.toISOString().split('T')[0];
+  },
+
+  // ─── Ajout rapide d'un client depuis la vente ────────────────────────────
+  _quickAddClient(targetSelectId) {
+    CLIENTS._onSaved = (client) => {
+      ['sale-client', 'sale-client-gen'].forEach(selId => {
+        const sel = document.getElementById(selId);
+        if (!sel) return;
+        const opt = document.createElement('option');
+        opt.value = client.id;
+        opt.textContent = selId === 'sale-client'
+          ? `${client.name}${client.phone ? ' (' + client.phone + ')' : ''}`
+          : client.name;
+        sel.appendChild(opt);
+        if (selId === targetSelectId) opt.selected = true;
+      });
+    };
+    CLIENTS.showForm();
   },
 
   async addToCart(productId) {
@@ -316,6 +337,11 @@ window.SALES = {
     await APP.addLog('SUCCESS', `Vente créée: ${sale.number}`, { amount: total, client: clientName, mode });
     showToast(`Vente ${sale.number} enregistrée`, 'success');
 
+    // Enregistrer en caisse si caisse ouverte
+    if (typeof CASHIER !== 'undefined' && CASHIER._activeCaisseId) {
+      await CASHIER.recordSaleMouvement(sale);
+    }
+
     // Impression optionnelle — choix PDF ou Ticket thermique
     showModal(`
       <div class="p-6">
@@ -366,7 +392,7 @@ window.SALES = {
     const start = (this._page - 1) * this._perPage;
     const page = ventes.slice(start, start + this._perPage);
 
-    const modeLabels = { cash: 'Espèces', mobile: 'Mobile', card: 'Carte', credit: 'Crédit' };
+    const modeLabels = Object.fromEntries(APP.getPaymentMethods().map(m => [m.id, m.label]));
 
     document.getElementById('sales-content').innerHTML = `
       <div class="space-y-3">
@@ -379,10 +405,7 @@ window.SALES = {
           <select onchange="SALES._filterMode=this.value;SALES._page=1;SALES._renderHistory()"
             class="bg-gray-700 border border-gray-600 rounded-lg px-2 py-2 text-sm text-white w-24 sm:w-36">
             <option value="">Tous</option>
-            <option value="cash"   ${this._filterMode==='cash'  ?'selected':''}>Espèces</option>
-            <option value="mobile" ${this._filterMode==='mobile'?'selected':''}>Mobile</option>
-            <option value="card"   ${this._filterMode==='card'  ?'selected':''}>Carte</option>
-            <option value="credit" ${this._filterMode==='credit'?'selected':''}>Crédit</option>
+            ${APP.getPaymentMethods().map(m => `<option value="${m.id}" ${this._filterMode===m.id?'selected':''}>${m.label}</option>`).join('')}
           </select>
         </div>
 
@@ -616,7 +639,7 @@ window.SALES = {
     doc.autoTable({
       startY: 72,
       head: [['Désignation', 'Qté', 'Prix unitaire', 'Total']],
-      body: (sale.items || []).map(i => [i.nom, i.qty + ' ' + (i.unite || ''), formatCurrency(i.price), formatCurrency(i.total)]),
+      body: (sale.items || []).map(i => [i.nom, i.qty + ' ' + (i.unite || ''), formatCurrency(i.price, currency), formatCurrency(i.total, currency)]),
       styles: { fontSize: 9, cellPadding: 4, overflow: 'ellipsize' },
       headStyles: { fillColor: [99, 102, 241], textColor: [255, 255, 255] },
       columnStyles: {
@@ -630,18 +653,18 @@ window.SALES = {
     const finalY = doc.lastAutoTable.finalY + 8;
     const rightX = pageW - 14;
     doc.setFontSize(10);
-    doc.text('Sous-total:', rightX - 50, finalY, { align: 'right' }); doc.text(formatCurrency(sale.subtotal), rightX, finalY, { align: 'right' });
+    doc.text('Sous-total:', rightX - 50, finalY, { align: 'right' }); doc.text(formatCurrency(sale.subtotal, currency), rightX, finalY, { align: 'right' });
     if (sale.remise > 0) {
       doc.setTextColor(200, 50, 50);
-      doc.text('Remise:', rightX - 50, finalY + 7, { align: 'right' }); doc.text('-' + formatCurrency(sale.remise), rightX, finalY + 7, { align: 'right' });
+      doc.text('Remise:', rightX - 50, finalY + 7, { align: 'right' }); doc.text('-' + formatCurrency(sale.remise, currency), rightX, finalY + 7, { align: 'right' });
       doc.setTextColor(0, 0, 0);
     }
     doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-    doc.text('TOTAL:', rightX - 50, finalY + 15, { align: 'right' }); doc.text(formatCurrency(sale.total), rightX, finalY + 15, { align: 'right' });
+    doc.text('TOTAL:', rightX - 50, finalY + 15, { align: 'right' }); doc.text(formatCurrency(sale.total, currency), rightX, finalY + 15, { align: 'right' });
 
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(100, 100, 100);
-    doc.text('Arrêté à la somme de : ' + amountToWords(sale.total) + ' ' + (config.currency || 'Ariary'), 14, finalY + 25);
-    doc.text('Mode de paiement : ' + sale.paymentMode, 14, finalY + 32);
+    doc.text('Arrêté à la somme de : ' + amountToWords(toDisplayAmount(sale.total)) + ' ' + (config.currency || 'Ariary'), 14, finalY + 25);
+    doc.text('Mode de paiement : ' + APP.getPaymentLabel(sale.paymentMode), 14, finalY + 32);
 
     if (config.signature) {
       doc.text('Signature :', pageW - 60, finalY + 50);
@@ -666,9 +689,8 @@ window.SALES = {
   printTicket(sale) {
     const config  = APP.config || {};
     const currency = config.currency || 'Ar';
-    const modeLabels = { cash: 'Espèces', mobile: 'Mobile Money', card: 'Carte bancaire', credit: 'Crédit' };
-    const modeLbl = modeLabels[sale.paymentMode] || sale.paymentMode || '';
-    const modeIcon = { cash: '💵', mobile: '📱', card: '💳', credit: '📋' }[sale.paymentMode] || '💰';
+    const modeLbl  = APP.getPaymentLabel(sale.paymentMode);
+    const modeIcon = APP.getPaymentIcon(sale.paymentMode);
     const cancelled = sale.status === 'cancelled';
 
     const now = new Date();
@@ -685,10 +707,7 @@ window.SALES = {
         <td class="item-total">${esc(formatCurrency(i.total, currency))}</td>
       </tr>`).join('');
 
-    const win = window.open('', '_blank', 'width=420,height=700,scrollbars=yes');
-    if (!win) { showToast('Autorisez les popups pour imprimer', 'error'); return; }
-
-    win.document.write(`<!DOCTYPE html>
+    const _html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
@@ -931,7 +950,11 @@ window.SALES = {
   };
 </script>
 </body>
-</html>`);
-    win.document.close();
+</html>`;
+    const _blob = new Blob([_html], { type: 'text/html; charset=utf-8' });
+    const _url  = URL.createObjectURL(_blob);
+    const win   = window.open(_url, '_blank', 'width=420,height=700,scrollbars=yes');
+    if (!win) { showToast('Autorisez les popups pour imprimer', 'error'); }
+    setTimeout(() => URL.revokeObjectURL(_url), 30000);
   }
 };

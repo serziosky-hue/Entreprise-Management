@@ -13,6 +13,7 @@ window.CONFIG_MOD = {
       { key: 'categories', label: 'Catégories', icon: 'M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z', perm: 'configCompany' },
       { key: 'widgets', label: 'Tableau de bord', icon: 'M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125-1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125h7.5', perm: 'configCompany' },
       { key: 'postes', label: 'Postes', icon: 'M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z', perm: 'configPostes' },
+      { key: 'paymentMethods', label: 'Paiements', icon: 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z', perm: 'configCompany' },
       { key: 'data', label: 'Données', icon: 'M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 2.625c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125m16.5 5.625c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125', perm: 'configData' },
       { key: 'subscription', label: 'Abonnement', icon: 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z', perm: null },
     ].filter(s => !s.perm || APP.canDo(s.perm));
@@ -80,6 +81,7 @@ window.CONFIG_MOD = {
       security: () => this._renderSecurity(config),
       categories: () => this._renderCategories(config),
       widgets: () => this._renderWidgets(config),
+      paymentMethods: () => this._renderPaymentMethods(config),
       postes: () => this._renderPostes(config),
       data: () => this._renderData(),
       subscription: () => this._renderSubscription(),
@@ -119,8 +121,10 @@ window.CONFIG_MOD = {
           <div>
             <label class="text-xs text-gray-400">Devise</label>
             <select id="cfg-currency" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm mt-1">
-              ${['Ar','€','$','MGA'].map(c => `<option ${(config.currency||'Ar')===c?'selected':''}>${c}</option>`).join('')}
+              <option value="Ar"  ${(config.currency||'Ar')==='Ar' ?'selected':''}>Ar  — Ariary malgache</option>
+              <option value="Fmg" ${(config.currency||'Ar')==='Fmg'?'selected':''}>Fmg — Franc malgache (1 Ar = 5 Fmg)</option>
             </select>
+            <p class="text-xs text-gray-500 mt-1">Convention : les montants sont toujours saisis en Ar. L'affichage en Fmg applique ×5 automatiquement.</p>
           </div>
           <div>
             <label class="text-xs text-gray-400">Seuil alerte caisse</label>
@@ -186,6 +190,104 @@ window.CONFIG_MOD = {
     await APP.addLog('INFO', 'Configuration entreprise mise à jour');
     showToast('Configuration enregistrée', 'success');
     document.querySelectorAll('#company-name, #company-name-m').forEach(el => { el.textContent = APP.config.name; });
+  },
+
+  // ─── Modes de paiement ───────────────────────────────────────────────────
+  _PM_DEFAULTS: [
+    { id: 'cash',   label: 'Espèces',        icon: '💵', isDefault: true },
+    { id: 'mobile', label: 'Mobile Money',   icon: '📱', isDefault: true },
+    { id: 'card',   label: 'Carte bancaire', icon: '💳', isDefault: true },
+    { id: 'cheque', label: 'Chèque',         icon: '📄', isDefault: true },
+    { id: 'credit', label: 'Crédit',         icon: '📋', isDefault: true },
+  ],
+
+  _renderPaymentMethods(config) {
+    const methods = config.paymentMethods || this._PM_DEFAULTS;
+    const rows = methods.map(m => `
+      <div class="flex items-center gap-3 bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2.5">
+        <span class="text-lg w-7 text-center leading-none">${escapeHtml(m.icon || '💰')}</span>
+        <span class="flex-1 text-sm text-white">${escapeHtml(m.label)}</span>
+        ${m.isDefault
+          ? '<span class="text-xs text-gray-500 px-2 py-0.5 bg-gray-700 rounded-full">Par défaut</span>'
+          : `<button onclick="CONFIG_MOD.deletePaymentMethod('${m.id}')"
+               class="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded transition-colors" title="Supprimer">
+               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                 <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+               </svg>
+             </button>`
+        }
+      </div>`).join('');
+
+    return `
+      <div class="p-4 space-y-4">
+        <div>
+          <h3 class="text-base font-semibold text-white">Modes de paiement</h3>
+          <p class="text-xs text-gray-400 mt-1">Configurez les modes disponibles dans les ventes, crédits et dépenses. Les modes par défaut ne peuvent pas être supprimés.</p>
+        </div>
+
+        <div class="space-y-2">${rows}</div>
+
+        <div class="bg-gray-700/30 border border-dashed border-gray-600 rounded-xl p-4 space-y-3">
+          <h4 class="text-sm font-medium text-white">Ajouter un mode</h4>
+          <div class="grid grid-cols-3 gap-3">
+            <div class="col-span-2">
+              <label class="text-xs text-gray-400">Nom *</label>
+              <input id="pm-label" type="text" placeholder="ex: Virement bancaire"
+                class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm mt-1"
+                maxlength="30" onkeydown="if(event.key==='Enter')CONFIG_MOD.addPaymentMethod()">
+            </div>
+            <div>
+              <label class="text-xs text-gray-400">Icône (emoji)</label>
+              <input id="pm-icon" type="text" placeholder="🏦"
+                class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm mt-1"
+                maxlength="2">
+            </div>
+          </div>
+          <button onclick="CONFIG_MOD.addPaymentMethod()"
+            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium transition-colors">
+            + Ajouter
+          </button>
+        </div>
+      </div>`;
+  },
+
+  async addPaymentMethod() {
+    const label = (document.getElementById('pm-label')?.value || '').trim();
+    const icon  = (document.getElementById('pm-icon')?.value  || '').trim() || '💰';
+    if (!label) { showToast('Le nom du mode est requis', 'error'); return; }
+
+    const methods = APP.config.paymentMethods ? [...APP.config.paymentMethods] : [...this._PM_DEFAULTS];
+
+    // Générer un ID depuis le label (sans accents, espaces → _)
+    const id = label.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+
+    if (methods.find(m => m.id === id || m.label.toLowerCase() === label.toLowerCase())) {
+      showToast('Ce mode de paiement existe déjà', 'error');
+      return;
+    }
+
+    methods.push({ id, label, icon, isDefault: false });
+    APP.config.paymentMethods = methods;
+    await DB.saveConfig(APP.config);
+    await FM.saveConfig(APP.config);
+    await APP.addLog('INFO', `Mode de paiement ajouté : ${label}`);
+    showToast(`"${label}" ajouté`, 'success');
+    this._renderSection();
+  },
+
+  async deletePaymentMethod(id) {
+    const methods = APP.config.paymentMethods || this._PM_DEFAULTS;
+    const method  = methods.find(m => m.id === id);
+    if (!method || method.isDefault) return;
+
+    APP.config.paymentMethods = methods.filter(m => m.id !== id);
+    await DB.saveConfig(APP.config);
+    await FM.saveConfig(APP.config);
+    await APP.addLog('INFO', `Mode de paiement supprimé : ${method.label}`);
+    showToast(`"${method.label}" supprimé`, 'success');
+    this._renderSection();
   },
 
   _renderUpdatesBlock() {

@@ -71,7 +71,7 @@ window.REPORTS = {
                 const pct = data.ca > 0 ? Math.round((v / data.ca) * 100) : 0;
                 return `
                   <div class="flex items-center gap-2">
-                    <div class="text-xs text-gray-400 w-20">${escapeHtml(mode)}</div>
+                    <div class="text-xs text-gray-400 w-20">${escapeHtml(APP.getPaymentLabel(mode))}</div>
                     <div class="flex-1 bg-gray-700 rounded-full h-2">
                       <div class="bg-indigo-500 rounded-full h-2" style="width:${pct}%"></div>
                     </div>

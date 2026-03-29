@@ -132,7 +132,7 @@ window.CLIENTS = {
             </div>
           </div>
           <div class="flex gap-3 mt-4">
-            <button onclick="closeModal()" class="flex-1 py-2 bg-gray-700 text-gray-300 rounded-lg text-sm">Annuler</button>
+            <button onclick="CLIENTS._onSaved=null;closeModal()" class="flex-1 py-2 bg-gray-700 text-gray-300 rounded-lg text-sm">Annuler</button>
             <button onclick="CLIENTS.save('${id||''}')" class="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">Enregistrer</button>
           </div>
         </div>
@@ -162,6 +162,15 @@ window.CLIENTS = {
     await SM.writeNow('clients', client.id, 'set', client);
     await APP.addLog('SUCCESS', `Client ${id ? 'modifié' : 'ajouté'}: ${name}`);
     showToast(`Client ${id ? 'modifié' : 'ajouté'}`, 'success');
+
+    // Callback externe (ex: ajout rapide depuis ventes)
+    if (this._onSaved) {
+      const cb = this._onSaved;
+      this._onSaved = null;
+      cb(client);
+      return;
+    }
+
     this.render();
   },
 

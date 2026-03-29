@@ -59,9 +59,14 @@ window.DASHBOARD = {
       const depFiltered = safeFilter(depenses, d => this._inRange(d.date, from, to));
 
       const totalCA = ventesPaid.reduce((s, v) => s + (v.total || 0), 0);
-      const totalEspeces = ventesPaid.filter(v => v.paymentMode === 'cash').reduce((s, v) => s + v.total, 0);
-      const totalMobile = ventesPaid.filter(v => v.paymentMode === 'mobile').reduce((s, v) => s + v.total, 0);
-      const totalCarte = ventesPaid.filter(v => v.paymentMode === 'card').reduce((s, v) => s + v.total, 0);
+      const totalByMode = {};
+      APP.getPaymentMethods().filter(m => m.id !== 'credit').forEach(m => {
+        totalByMode[m.id] = ventesPaid.filter(v => v.paymentMode === m.id).reduce((s, v) => s + v.total, 0);
+      });
+      // Alias rétro-compatibles pour les clés de widget existantes
+      const totalEspeces = totalByMode['cash']   || 0;
+      const totalMobile  = totalByMode['mobile'] || 0;
+      const totalCarte   = totalByMode['card']   || 0;
       const totalDep = depFiltered.reduce((s, d) => s + (d.amount || 0), 0);
       const solde = totalCA - totalDep;
       const creditsEnAttente = safeFilter(credits, c => c.status === 'pending').reduce((s, c) => s + (c.balance || 0), 0);
@@ -75,9 +80,15 @@ window.DASHBOARD = {
         { key: 'solde', label: 'Solde caisse', value: formatCurrency(solde), icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', color: solde < (config.cashThreshold || 0) ? 'text-red-400' : 'text-green-400' },
         { key: 'ca', label: "Chiffre d'affaires", value: formatCurrency(totalCA), icon: 'M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0z', color: 'text-blue-400' },
         { key: 'depenses', label: 'Total dépenses', value: formatCurrency(totalDep), icon: 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z', color: 'text-red-400' },
-        { key: 'especes', label: 'Ventes espèces', value: formatCurrency(totalEspeces), icon: 'M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75', color: 'text-emerald-400' },
-        { key: 'mobile', label: 'Ventes mobile', value: formatCurrency(totalMobile), icon: 'M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 8.25h3', color: 'text-purple-400' },
-        { key: 'carte', label: 'Ventes carte', value: formatCurrency(totalCarte), icon: 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z', color: 'text-cyan-400' },
+        { key: 'especes', label: `Ventes ${APP.getPaymentLabel('cash').toLowerCase()}`,  value: formatCurrency(totalEspeces), icon: 'M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75', color: 'text-emerald-400' },
+        { key: 'mobile',  label: `Ventes ${APP.getPaymentLabel('mobile').toLowerCase()}`, value: formatCurrency(totalMobile),  icon: 'M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 8.25h3', color: 'text-purple-400' },
+        { key: 'carte',   label: `Ventes ${APP.getPaymentLabel('card').toLowerCase()}`,   value: formatCurrency(totalCarte),   icon: 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z', color: 'text-cyan-400' },
+        // Modes personnalisés (non inclus dans les 3 defaults ci-dessus)
+        ...APP.getPaymentMethods().filter(m => !['cash','mobile','card','credit','cheque'].includes(m.id)).map(m => ({
+          key: `pm_${m.id}`, label: `Ventes ${m.label.toLowerCase()}`,
+          value: formatCurrency(totalByMode[m.id] || 0),
+          icon: 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z', color: 'text-indigo-400'
+        })),
         { key: 'nbVentes', label: 'Nombre de ventes', value: ventesPaid.length, icon: 'M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185z', color: 'text-yellow-400' },
         { key: 'credits', label: 'Crédits en attente', value: formatCurrency(creditsEnAttente), icon: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z', color: creditsEnAttente > 0 ? 'text-orange-400' : 'text-gray-400' },
       ];

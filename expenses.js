@@ -166,7 +166,7 @@ window.EXPENSES = {
               <div>
                 <label class="text-xs text-gray-400">Mode paiement</label>
                 <select id="dep-mode" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm mt-1">
-                  ${['Espèces','Mobile','Carte','Chèque'].map(m => `<option ${(d?.paymentMode||'Espèces')===m?'selected':''}>${m}</option>`).join('')}
+                  ${APP.getPaymentMethods().filter(m => m.id !== 'credit').map(m => `<option value="${m.id}" ${(d?.paymentMode||'cash')===m.id?'selected':''}>${m.icon} ${m.label}</option>`).join('')}
                 </select>
               </div>
             </div>
@@ -202,6 +202,12 @@ window.EXPENSES = {
     closeModal();
     await DB.put('depenses', dep);
     await SM.writeNow('depenses', dep.id, 'set', dep);
+    
+    // Enregistrer en caisse si caisse ouverte et dépense payée en espèces (sortie)
+    if (typeof CASHIER !== 'undefined' && CASHIER._activeCaisseId && dep.paymentMode === 'cash') {
+      await CASHIER.recordExpenseMouvement(dep);
+    }
+    
     await APP.addLog('SUCCESS', `Dépense ${id?'modifiée':'ajoutée'}: ${motif} (${formatCurrency(amount)})`);
     showToast(`Dépense ${id?'modifiée':'ajoutée'}`, 'success');
     this._renderSimple();
@@ -524,12 +530,17 @@ window.EXPENSES = {
         amount: a.amountPerPeriod,
         date: dueDate.toISOString().split('T')[0],
         category: a.category || 'Autre',
-        paymentMode: 'Espèces',
+        paymentMode: 'cash',
         amortized: true,
         amortizedId: a.id
       };
       await DB.put('depenses', dep);
       await SM.writeNow('depenses', dep.id, 'set', dep);
+
+      // Enregistrer en caisse si caisse ouverte et dépense payée en espèces (sortie)
+      if (typeof CASHIER !== 'undefined' && CASHIER._activeCaisseId) {
+        await CASHIER.recordExpenseMouvement(dep);
+      }
 
       // Marquer comme payé
       a.payments = [...(a.payments || []), { date: dueDate.toISOString(), amount: a.amountPerPeriod, depenseId: dep.id }];

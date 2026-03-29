@@ -725,7 +725,7 @@ window.STOCKS = {
         amount: totalCost,
         date: new Date().toISOString().split('T')[0],
         category: depCat,
-        paymentMode: 'Espèces',
+        paymentMode: 'cash',
         notes: raison,
         amortized: false,
         sourceType: 'achat_stock',
@@ -734,6 +734,12 @@ window.STOCKS = {
       };
       await DB.put('depenses', dep);
       await SM.writeNow('depenses', dep.id, 'set', dep);
+      
+      // Enregistrer en caisse si caisse ouverte (sortie pour achat stock)
+      if (typeof CASHIER !== 'undefined' && CASHIER._activeCaisseId) {
+        await CASHIER.recordStockPurchaseMouvement(dep, p, qty, price);
+      }
+      
       showToast(`Stock mis à jour + dépense de ${formatCurrency(totalCost)} créée`, 'success');
     } else {
       showToast(`Stock mis à jour : ${oldStock} → ${newStock} ${p.unite||''}`, 'success');
